@@ -1,13 +1,16 @@
 /**
- * The workspace rulers are hidden (owner decision 2026-09-30: hide them
- * entirely and come back to them later). On main their marks were off the
- * sheet by up to 30 in; the fix in progress is parked on the branch
- * editor/rulers-match-sheet (docs/fixes/04-rulers-match-sheet.md there).
+ * The switch that hides the workspace rulers (RULERS_ENABLED,
+ * config/features.ts). The owner hid them on 2026-09-30, when their marks
+ * were off the sheet by up to 30 in, and showed them again on 2026-10-16
+ * with fix 04 (docs/fixes/04-rulers-match-sheet.md). This file turns the
+ * switch off and checks what it hides: the editor draws no ruler and
+ * offers no "Show ruler" control. The rulers as shipped are
+ * src/poster/__tests__/rulers.test.tsx.
  *
- * The editor draws no ruler and offers no "Show ruler" control. The grid
- * and its toggle are hidden too since record 29 (ADJUSTMENTS_ENABLED): this
- * file turns them back on, so the overlays section the ruler toggle would
- * join is drawn and its absence there means something.
+ * The grid and its toggle are hidden too since record 29
+ * (ADJUSTMENTS_ENABLED): this file turns them back on, so the overlays
+ * section the ruler toggle would join is drawn and its absence there means
+ * something.
  *
  * Re-run: npx vitest run src/poster/__tests__/rulersHidden.test.tsx
  */
@@ -15,9 +18,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Record 29 hid the grid toggle (the overlays section this file reads) (config/features.ts ADJUSTMENTS_ENABLED);
 // this file tests that kept code, so it turns the switch on. The shipped
 // configuration is src/poster/__tests__/mvpHidden.test.tsx.
+// And it turns the rulers' switch off, which is what it tests.
 vi.mock('@/config/features', async (orig) => ({
   ...(await orig<typeof import('@/config/features')>()),
   ADJUSTMENTS_ENABLED: true,
+  RULERS_ENABLED: false,
 }));
 import { act, screen } from '@testing-library/react';
 
@@ -60,7 +65,7 @@ afterEach(() => {
 const inchLabels = () => [...document.querySelectorAll('span')]
   .filter((sp) => /^-?\d+"$/.test(sp.textContent?.trim() ?? ''));
 
-describe('the workspace rulers are hidden', () => {
+describe('with RULERS_ENABLED off, the workspace rulers are hidden', () => {
   it('the editor draws no ruler', async () => {
     // jsdom lays nothing out: give every box a size, or a ruler would draw
     // no marks and the test could not see it.

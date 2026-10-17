@@ -105,4 +105,84 @@ export const EDGE_POSTERS = [
   build: (a, d) => ({ ...d, blocks: filled(a.t['3col@48x36']), styles: withRaw(d.styles, level, raw) }),
 }));
 
-export const posterById = (id) => [...POSTERS, ...EDGE_POSTERS].find((p) => p.id === id);
+/**
+ * The poster every database row was created with before the typography
+ * calibration (record 37): the posters table's first default for `data`,
+ * copied from `supabase/migrations/20260408000100_posters.sql` as commit
+ * 853ec1c wrote it (rewritten in place by 979df80, 2026-04-09, which also
+ * added the editor page's load-time repair). Sizes in poster units: title 60,
+ * heading 28, authors 22, body 18 (432 / 201.6 / 158.4 / 129.6 pt). The
+ * client's own pre-calibration DEFAULT_STYLES (24 / 13 / 11 / 9, before
+ * 9aa4620) were used only by a test and never written into a poster.
+ */
+export const OLD_DEFAULT_DATA = {
+  version: 1,
+  widthIn: 48,
+  heightIn: 36,
+  blocks: [],
+  fontFamily: 'Source Sans 3',
+  palette: { bg: '#ffffff', primary: '#1a1a26', accent: '#7c6aed', accent2: '#4a6cf7', muted: '#6b7280', headerBg: '#f3f4f6', headerFg: '#1a1a26' },
+  styles: {
+    title: { size: 60, weight: 700, italic: false, lineHeight: 1.1, color: null, highlight: null },
+    heading: { size: 28, weight: 700, italic: false, lineHeight: 1.2, color: null, highlight: null },
+    authors: { size: 22, weight: 400, italic: false, lineHeight: 1.3, color: null, highlight: null },
+    body: { size: 18, weight: 400, italic: false, lineHeight: 1.4, color: null, highlight: null },
+  },
+  headingStyle: { border: 'bottom', fill: false, align: 'left' },
+  institutions: [],
+  authors: [],
+  references: [],
+};
+
+/**
+ * Posters for record 37's reload scenarios (lib/textSizeReloadScenarios.mjs):
+ * the old default as a new row held it (no blocks); an old poster a user
+ * wrote into before the calibration (its blocks, the old sizes); the same
+ * with one level changed by hand (body 9 units, 64.8 pt: the only way a
+ * poster could hold some old sizes and not others was an edit in the half
+ * hour between autosave, 4e3190c, and the repair, 979df80); a font the
+ * font list does not have, stored (a sibling read: fonts are not repaired);
+ * and two odd shapes of the old default (its sizes as strings, its authors
+ * level missing), information from review round 1.
+ */
+export const RELOAD_POSTERS = [
+  { id: 'old-default-empty', size: { w: 48, h: 36 }, build: () => structuredClone(OLD_DEFAULT_DATA) },
+  {
+    // Written into: the template's blocks given text, and the harness's
+    // made-up authors (so the authors block draws its level too).
+    id: 'old-default-written', size: { w: 48, h: 36 },
+    build: (a, d) => ({ ...structuredClone(OLD_DEFAULT_DATA), blocks: filled(a.t['3col@48x36']), authors: d.authors, institutions: d.institutions }),
+  },
+  {
+    id: 'old-default-one-edited', size: { w: 48, h: 36 },
+    build: (a, d) => {
+      const o = structuredClone(OLD_DEFAULT_DATA);
+      return { ...o, blocks: filled(a.t['3col@48x36']), authors: d.authors, institutions: d.institutions, styles: { ...o.styles, body: { ...o.styles.body, size: 9 } } };
+    },
+  },
+  {
+    id: 'font-not-listed', size: { w: 48, h: 36 },
+    build: (a, d) => ({ ...d, blocks: filled(a.t['3col@48x36']), fontFamily: 'ZQ Unlisted Sans' }),
+  },
+  // Review round 1 of record 37 (R37-5): two odd shapes of the old default
+  // that no known writer produced, read as information: its four sizes stored
+  // as strings, and the old default with the authors level missing.
+  {
+    id: 'old-default-strings', size: { w: 48, h: 36 },
+    build: (a, d) => {
+      const o = structuredClone(OLD_DEFAULT_DATA);
+      const styles = Object.fromEntries(Object.entries(o.styles).map(([k, v]) => [k, { ...v, size: String(v.size) }]));
+      return { ...o, blocks: filled(a.t['3col@48x36']), authors: d.authors, institutions: d.institutions, styles };
+    },
+  },
+  {
+    id: 'old-default-authors-absent', size: { w: 48, h: 36 },
+    build: (a, d) => {
+      const o = structuredClone(OLD_DEFAULT_DATA);
+      const { authors: _authors, ...styles } = o.styles;
+      return { ...o, blocks: filled(a.t['3col@48x36']), authors: d.authors, institutions: d.institutions, styles };
+    },
+  },
+];
+
+export const posterById = (id) => [...POSTERS, ...EDGE_POSTERS, ...RELOAD_POSTERS].find((p) => p.id === id);

@@ -1,0 +1,678 @@
+# Fix 04 — the rulers do not line up with the poster
+
+**Plan item:** 4 · **Branch:** `fix/04-rulers` (off main `ac7d793`), the port of the parked local branch `editor/rulers-match-sheet` (off main `7f93b5b`) · **Status:** implemented and shown again (`RULERS_ENABLED = true`, the owner's "start them now", 2026-10-16); review round 1 of the port done and corrected (section 11.9, 2026-10-17); its re-review is next
+
+**How to read this record.** Sections 1 to 9 are the work of 2026-09-10 to 2026-09-30 on the parked branch, kept as they were: their numbers are that tree's (main `7f93b5b` plus the change), measured before main moved on by fixes 07 to 36. On 2026-09-30 the owner hid the rulers ("hide this entirely and we can work on it later") and the branch was parked mid-way through its last follow-ups (its WIP commit `cc1b139`). Section 11 is the port onto main `ac7d793` and the finish (2026-10-16), with every number re-measured on this tree; section 11.9 is the review of the port and its correction (2026-10-17), with every claim re-measured once more; section 10 is the limits and follow-ups as they stand after it. Where section 11 and an earlier section disagree, section 11 holds, and where 11.9 and an earlier part of section 11 disagree, 11.9 holds.
+
+**Base (2026-09-30, kept):** the branch sat on main `7f93b5b`. Main was then `10ac9bb`, which added `apps/web/scripts/__tests__/mutantSpecs.test.mjs` (every committed mutants spec must still apply) and the port of fix 02's sheet spec. The second step 10 review's critic ran main's spec test on the fix with this record's spec as it stood then: 10 of 10 pass (TESTED by the critic).
+
+## 1. Symptom
+
+The workspace rulers show inches, but their marks do not sit on the
+poster's inches. Opening the editor at the default window (1280 × 800, the
+guidelines panel closed, as it opens there) on a 48 × 36 in poster and
+pressing Fit, the top ruler's 0" mark is 24 px (1.7 in) to the right of the
+sheet's left edge, and the left ruler's 0" mark is 61.5 px (4.4 in) above
+the sheet's top edge (MEASURED, `fit-check.mjs --only
+fit-1280x800-48x36-default` on `aee80ac`: zoom 1.392, 13.9 px per inch).
+Plan item 4 was reported as "off by up to 30 in" (the stress test, on
+extreme poster shapes); record 03 measured up to 52 in before fix 03 and
+−61.5 to −81.5 px after it, on the axis where the sheet is centred.
+
+## 2. Hypotheses
+
+| id | claim | prediction that would confirm it |
+|---|---|---|
+| H1 | The rulers put 0" at the workarea's gutter less the scroll, but the workarea centres the sheet in the canvas when the sheet and its gutters are narrower than the canvas; that centring offset is left out. | On an axis where the sheet is centred, the 0" error equals minus the centring offset, (canvas span − sheet span − 2 × gutter) / 2, plus H2's constant; on the axis the sheet fills, the offset is 0. The error changes with the window size, the guidelines panel and the poster's shape exactly as the offset does. |
+| H2 | The ruler bars start 24 px in (the top bar at `left: 24`, the left bar at `top: 24`), but the marks are placed in the canvas's coordinates, so every mark is shifted 24 px along its ruler. | On the axis the sheet fills, every mark is off by +24 px, at every zoom, scroll and window size. |
+| H3 | The scale and the scroll are right: one ruler inch is one poster inch on screen, and scrolling moves the marks with the sheet. | The error is the same at 0" and at the far edge (no drift across the ruler), and zooming in and scrolling leave it unchanged. |
+| H-alt | Something else moves the marks: the frame growing when text overflows the sheet, a scrollbar's width, a transform or border, rounding at a fractional device pixel ratio. | After H1 and H2 are accounted for, an error remains, and it changes with overflowing text, classic scrollbars or the device pixel ratio. |
+
+## 3. Method
+
+Graph: `list_graph_stats_tool` — 664 files, 7848 nodes, built at `aee80ac`, head matches build: true. The rulers are inline JSX in `PosterEditor` (the graph's smallest node there is the whole component), so their surfaces below come from the graph's callers of `useZoom` and `fitSheet` plus a grep for "ruler" (INSPECTED).
+
+| surface | file:line | touched | check |
+|---|---|---|---|
+| the top and left ruler bars, their ticks and labels, and the corner square | PosterEditor.tsx:3272-3370 | yes | `scripts/ruler-check.mjs` |
+| the ruler's origin (`canvasOriginX/Y`, the only copy of the sheet's position kept by formula) | PosterEditor.tsx:3283-3284 | yes | `scripts/ruler-check.mjs` |
+| the editor's scroll state, which main's rulers followed; since cause C the rulers read the scroll themselves, and the state stays only for the re-render that keeps the text editor's focus hint on its block | PosterEditor.tsx:696-704 (on `aee80ac`; now :697-708) | yes: the rulers no longer take it, and its comment says what it is kept for | `scripts/ruler-check.mjs` zoomed-in scenarios and `text-hint-follows-scroll` |
+| the workarea's padding and centring the rulers must follow | PosterEditor.tsx:2900-2935 | no | `scripts/ruler-check.mjs` |
+| the "Show ruler" toggle | Sidebar.tsx:1069-1073 | no | existing tests |
+| the phone share view (no rulers) and the desktop share view (rulers) | PosterEditor.tsx:749 | no | `scripts/ruler-check.mjs` scenario `share-desktop-1440x900` (added after the step 9 review, CR9-04-09); phone unchanged |
+| export and thumbnails strip the overlays | PosterEditor.tsx:2313-2336, data/thumbnails.ts:91 | comments only (they said the rulers carry `data-postr-overlay`; they never did) | existing export tests |
+| the gutter the fit, the padding and the rulers share | workspaceGeometry.ts:1-20 | comment only | none |
+| fit-check's claim Hr (the filled axis at 24 px, which this fix changes to 0) | scripts/fit-check.mjs:181-190 | yes | `scripts/fit-check.mjs` |
+| the index docs that describe the rulers | docs/feature-graph.md (the `WorkspaceRulers.tsx` entry), docs/manual-test-flows.md | feature-graph.md yes: the entry rewritten for the final design after the second step 10 review (R1-F2); manual-test-flows.md no: its one mention, print strips the grid and ruler (:484), still holds | step 12 |
+
+Instruments (committed with the fix):
+- `apps/web/scripts/ruler-check.mjs` — a browser harness (`lib/editorHarness.mjs`). For every scenario it reads every visible tick of both rulers against where that inch of the sheet is on screen, each tick's inch taken from the ruler's own labels, and reports the error per tick (px and inches), the drift along each ruler (H3), and the residual after H1 + H2's prediction (the bar's 24 px less the sheet's centring offset, read from the page's layout). It also reports `gapIn`, the longest stretch at either end of a bar with no mark (in inches; over 1.02 in, a ruler that stopped part of the way along), and counts a ruler with no marks as the defect. Control: the fitted sheet is fully on screen (fix 03's guarantee) and the labels agree on each ruler's first inch. 83 scenarios at rest (`--list` prints them; 79 before the step 9 review added the desktop share view and a poster size change, 81 until the step 9-F review added `size-change-24x36-to-48x36` and `fit-after-pinch`): 4 windows × 5 poster shapes × the guidelines panel as it opens, open and closed; zoomed in 4 steps and scrolled to the start, the middle and the end; zoomed out 2 steps; device pixel ratios of 1.5 and 2; a 13.33 × 7.5 in and a 3 × 3 in poster; and, added for the completeness critic's gaps (section 5), the editor as opened, a resize and a panel closing at a fit capped at 5×, a Preview round trip by its button and by Escape, zooming out to the floor, two scroll clamps and the sidebar hidden. `POSTR_BROWSER` runs it in Chromium, Firefox or WebKit, and `POSTR_SCROLLBARS=classic` with scrollbars that take space (Chromium and WebKit). One INFO reading, which does not affect the exit: the workspace grid's offset from the sheet (`grid`). Whether the text editor's focus hint follows a scroll (`text-hint-follows-scroll`) began as INFO and is a claim since the step 9 review of cause C (S9C-05, section 8).
+  - With `--frames` (added for cause C, section 8), 13 scenarios read on every frame from the input until the layout is still, sampled after the page's resize observers and before paint, each frame judged against the sheet's layout slot (`--frames --list` prints them).
+- `apps/web/scripts/lib/frameRecorder.mjs` — `--frames`' sampler and judge (a stale frame: a tick more than 0.5 px off, a ruler with no mark, or a stretch of bar over 1.05 in with no tick).
+- `apps/web/scripts/ruler-sync-check.mjs` — counts, per input, how often the rulers take their synchronous path and how often React refuses a flush; `--mutant <name>` serves a mutant of this fix's spec with it (steps 9-E and 9-F; its `content` input after the second step 10 review).
+- `apps/web/scripts/fit-check.mjs`'s `rulerError` (the 0" marks only), used to reproduce (section 1).
+- Every judge above reads layout boxes, never paint (section 10, "Checks not run").
+
+## 4. Results before the fix
+
+`node scripts/ruler-check.mjs` on `aee80ac` (main), 65 scenarios, 0 errors, controls passed (MEASURED):
+
+| measure | result |
+|---|---|
+| scenarios with a tick off by more than 0.5 px | 65 of 65 |
+| worst error | 622 px, 38.8 in (a 60 × 30 in poster at 1280 × 800 with the panel open: the left ruler 225 px off at zoom 0.58); the largest in pixels is 622 px at 2560 × 1440 on 30 × 60 in |
+| at the default window (1280 × 800, the panel as it opens), 5 shapes, per ruler (the least and the most any one ruler was off) | 1.29 to 13.03 in |
+| on the axis the sheet fills | +24 px in 67 of 67 measurements (23.99 to 24.00) |
+| drift along one ruler (H3) | ≤ 0.01 px in 65 of 65 |
+| residual after H1 + H2's prediction | ≤ 0.01 px in 65 of 65, including a device pixel ratio of 1.5 |
+
+Zoomed in 4 steps and scrolled to the start, the middle or the end, both rulers are off by +24 px only (the sheet fills both axes); zoomed out 2 steps, by −48 px and −115.5 px (the sheet is centred on both). So H1 and H2 explain the whole error, and H3 holds: the scale and the scroll are right (MEASURED). H-alt's device pixel ratio leaves no residual; overflowing text and classic scrollbars are not in this sweep (confirmer B's scope).
+
+An earlier run of this instrument exited 1 from a crash in its own teardown (`h.close` is not the harness's API), which would have read as "defect observed"; it now exits 2 on any uncaught error, and the numbers above are from the corrected instrument.
+
+The instrument then grew to 79 scenarios for the completeness critic's gaps (section 5). The full sweep on main with it, `node scripts/ruler-check.mjs` run from frozen main's `apps/web` with `POSTR_REPO` set to it (`aee80ac`, chromium, 0 errors, controls passed; MEASURED):
+
+| measure | result |
+|---|---|
+| scenarios with a mark off by more than 0.5 px | 79 of 79 |
+| worst error | 622 px (30 × 60 in at 2560 × 1440, the panel closed); in inches, 138 in (the 20 % zoom floor) |
+| at the default window (1280 × 800), 5 shapes, per ruler (the least and the most any one ruler was off) | 1.29 to 13.03 in (per scenario, the worse of its two rulers: 4.14 to 13.03 in) |
+| on the axis the sheet fills | +24 px in 75 of 75 (23.99 to 24.00) |
+| drift along one ruler (H3) | ≤ 0.02 px in 79 of 79 |
+| residual after H1 + H2's prediction | ≤ 0.02 px in 79 of 79 |
+| a stretch of bar over one inch with no mark (cause B) | 11 of 79: the three capped-fit cases (4.96 to 11.96 in), hiding the sidebar (7.86 in), and seven fits with the guidelines panel closed at 1920 × 1080 and 2560 × 1440 (2.55 to 17.96 in), where the panel's closing animation widens the canvas after the rulers' last render |
+
+## 5. Independent confirmation (before any change)
+
+Both on a frozen copy of main (`aee80ac`), each with its own browser instruments (pixel scans of screenshots and layout reads), neither reading this record's instruments.
+
+- Confirmer A — scope: the reported entry point (1280 × 800, the panel as it opens, 48 × 36 in, Fit) and the mechanism, one change at a time: window width and height, the panel, poster shapes, and counterfactual mutants of each cause.
+- Confirmer B — scope: other entry points (zoomed in with the buttons and scrolled, a pinch, custom 10 × 10 and 100 × 20 in sizes set in the size fields, a window resized mid-session, the desktop share view, a device pixel ratio of 1.5, emulated classic scrollbars, overflowing text) and the alternative causes.
+
+**The defect exists: CONFIRMED by both.**
+- A: 60 of 60 conditions; at the default, all 49 on-sheet ticks of the top ruler +24.00 px (1.72 in) and all 37 of the left −61.50 px (−4.46 in); up to −120.9 in at a 700 × 800 window (MEASURED by confirmer A, `a1-default.mjs`, `a2-sweep.mjs`, in its folder `fix4-confirm-a`). Controls: known 1 px marks drawn over the workspace read back within ±0.5 px (4 of 4); pixel and layout readings agree within 0.52 px.
+- B: 3838 of 3838 visible ticks off by more than 1 px over 82 readings; the reported "up to 30 in" reproduced as −36.71 in on a 100 × 20 in poster at the fit (MEASURED by confirmer B, `ruler-probe.mjs`, in `fix4-confirm-b`). Controls: injected marks read back within 0.167 px (4 of 4, at DPR 1 and 1.5); DOM and pixel positions agree for 3838 of 3838 ticks.
+
+**Hypotheses:**
+- H1 (centring): CONFIRMED by A, 120 of 120 axis-conditions and 5109 of 5109 on-sheet ticks within ±0.1 px (layout) of 24 − offset; consistent in B's 82 of 82 readings, at centrings from 0 to 269.2 px.
+- H2 (the bar's 24 px): CONFIRMED by A on 61 of 61 filled axes; a counterfactual with only the bars' inset removed reads 0.00 px on 21 of 21 filled axes, and with both causes removed 0.000 px on 84 of 84. B: 43 of 43 uncentred readings at 24 ± 0.05 px, across 9 zooms, scrolled or not.
+- H3 (scale and scroll): CONFIRMED by B (spread along a ruler ≤ 0.016 px in 82 of 82; the error unchanged by scrolling to the middle and the far corner at 184 % and 229 %); A: no drift at the fitted zoom, 120 of 120.
+- H-alt: REFUTED for the mechanisms tested. Overflowing text does not grow the frame (frame height = sheet height in 41 of 41 states; only the scroll height grows); DPR 1.5 gives the same layout errors; emulated classic scrollbars shift the centring exactly as H1 predicts. Native Windows scrollbars: UNMEASURED.
+
+**New defects the confirmers reported** (all LOW, on main; none is caused by the ruler origin):
+- The out-of-bounds banner covers the top ruler: 22 of 55 marks hidden at 1280 × 800 (MEASURED by both confirmers, independently).
+- At windows 640–700 px wide the guidelines button covers FIT, and a click on FIT opens the guidelines panel (MEASURED by confirmer A, 4 of 4 widths; FIT on top at 5 of 5 widths from 720 px).
+- With scrollbars that take space (emulated), the ruler bars cover the first 24 px of the canvas's scrollbars (MEASURED by confirmer B, emulated; native UNMEASURED).
+- The canvas's own 10 px scrollbar style never applies in Chromium: `scrollbar-width: thin` overrides the `::-webkit-scrollbar` rules (MEASURED by confirmer B).
+
+Where they went (the MVP triage, PLAN.md "MVP scope and the Later list"): FIT covered at 640–700 px joins item 21 (the guidelines panel on narrow windows); the other three are on the Later list.
+
+Critic — 13 gaps (3 HIGH, 5 MEDIUM, 5 LOW), each measured or placed before the fix, with `scripts/ruler-check.mjs` scenarios added for them (on `aee80ac`, chromium):
+- HIGH — the rulers draw marks only across the canvas size read at their last render, and a resize that leaves the zoom unchanged (a fit capped at 5×) renders nothing: **CONFIRMED, a second defect.** After the window grows from 1280 × 800 to 1920 × 1080, the top ruler stops 11.96 in short of the end of its bar on a 10 × 10 in and an 8.5 × 11 in poster; closing the guidelines panel leaves 4.96 in bare (MEASURED, `capped-resize-10x10`, `capped-resize-8.5x11`, `capped-panel-close-10x10`; new reading `gapIn`, the longest stretch of a bar with no mark). The offset in those scenarios is still H1 + H2 exactly (residual 0). Cause B in section 6.
+- HIGH — Preview hides the editor with `display: none`, which might reset the scroll without a scroll event: **REFUTED in Chromium.** The scroll is 216 px before and after, by the button and by Escape, residual 0.01 px (MEASURED, `preview-roundtrip-button`, `-escape`). Firefox and WebKit: section 8.
+- HIGH — the dark workspace grid around the sheet starts at the canvas's corner, not at the sheet: **CONFIRMED from layout**, 5.58 px (X) and 10.33 px (Y) at the default, as the critic predicted from the code (MEASURED, the INFO `grid` reading, layout and computed CSS; paint not read). The same kind of cause (section 6), but it does not block the MVP: Later.
+- MEDIUM — the browser moves the scroll itself when the content shrinks: Chromium sends the scroll event (MEASURED, `scroll-clamp-zoom-out`, `scroll-clamp-window-grows`: residual 0.01 px). Scroll anchoring: UNMEASURED.
+- MEDIUM — below the fit: the rulers are 131 in and 138 in off at the 20 % floor, all of it H1 + H2 (MEASURED, `zoom-out-to-floor`, residual 0). A mark every 2 px there: Later.
+- MEDIUM — Firefox and WebKit: before the fix a smoke run in each gives Chromium's errors (+24 and −61.5 px at the default, residual ≤ 0.01 px, MEASURED); the whole sweep runs in all three after the fix (section 8).
+- MEDIUM — the marks lagging the sheet by a frame during a continuous scroll or pinch: not measured; the fix reads the sheet in the same render the scroll already caused (INSPECTED). Later. *Superseded: the first step 10 review measured such lags and found some were the fix's (cause C, section 6); since cause C the rulers read a scroll in the scroll event itself (section 7).*
+- MEDIUM — real classic scrollbars at the fit: UNMEASURED (Linux Chromium with scrollbars, or Windows). The fix reads where the sheet is, so a scrollbar's width does not enter it (INSPECTED).
+- LOW — hiding the sidebar: residual 0.01 px (MEASURED, `sidebar-hidden`). A device pixel ratio of 2, a 13.33 × 7.5 in slide and a 3 × 3 in sheet (sizes the fields refuse): scenarios added, section 8. The entrance animation: see cause B's sibling below and section 7. Page zoom, and reading a block's edge on the ruler: section 10.
+
+## 6. Root cause
+
+Two causes, one mistake behind both: **the rulers keep their own copy of the workspace's layout instead of reading it.**
+
+- **A (the offset: H1 and H2).** The rulers place 0" at `gutterX − scroll` and `gutterY − scroll`, a formula for where the sheet sits in the canvas (`PosterEditor.tsx:3283-3284` on `aee80ac`). The page's layout disagrees with it in two ways: the workarea centres the sheet when the sheet and its gutters are smaller than the canvas (H1), and the ruler bars start 24 px into the canvas, so a position in the canvas is 24 px off in the bar (H2). It is the only formula copy of the sheet's position in the editor: the fit, the wheel and pinch zoom and the rubber band all read rendered boxes (INSPECTED, a grep of `gutterX`, `gutterY` and `scrollPos` in `src/poster` and `src/components`, and confirmer A's). It is the same kind of mistake as fix 03's cause A, the workspace's geometry written down in a second place that stopped agreeing.
+- **B (the bare stretch of ruler).** The rulers read the canvas's size during render (`canvasRef.current?.clientWidth`, `PosterEditor.tsx:3286-3287`) and nothing re-renders the editor when the canvas changes size but the fit does not: `useZoom` keeps the same state object when the zoom and the gutter are unchanged. That happens at the 5× cap, and whenever the fit is set by the other axis: a sheet whose fit is limited by its height keeps its zoom while the guidelines panel closes or the sidebar hides and the canvas widens (the gutter changes only for a canvas under 256 px, `workspaceGeometry.ts`). MEASURED on main: 11 of 79 scenarios, section 4.
+
+- **C (a frame or two behind), found by the step 10 review.** The rulers' reading of a resize (the observer) or a scroll (the editor's scroll state) reached the page through React state, which commits a task later, after the browser has painted the frame. So on leaving Preview, a size change that moves nothing else, the guides panel closing, the sidebar hiding and each pinch step, the rulers showed the old position for 1–5 frames. Main shows none of it on these (its rulers read no layout, so they have nothing to deliver late; its marks are off by a constant instead), except the pinch, where main's own lag equals it. MEASURED in section 9 (G1, G2).
+
+**Siblings checked** (process step 5):
+- the dark workspace grid, a CSS background tiled from the canvas's corner: the same kind of cause, CONFIRMED from layout (section 5); Later, since it does not block the MVP. The rulers' measured sheet position could feed its `background-position`;
+- the text editor's focus hint, a fixed-position note placed from its editor's box during render: it stays on its block through a scroll only because the editor re-renders on every scroll event, which it did to feed the rulers (since cause C the rulers read the scroll themselves; the editor keeps the re-render for the hint, and `text-hint-follows-scroll` guards it). MEASURED: with that re-render removed (a probe mutant), the hint is left 60 px from its block by a 60 px scroll (4.68 → 64.68 px), and on main it stays at 3.99 px (`ruler-check.mjs` `text-hint-follows-scroll`, INFO then, a claim since S9C-05). So the fix keeps the editor's scroll state and its re-render on scroll, for the hint only. Before cause C the fix also passed that state to the rulers; since cause C the rulers have a scroll listener of their own and take no scroll from the editor (section 7);
+- a change that moves the sheet's painted box without any event: the entrance animation scales the sheet's frame from 0.96 about its centre (a GSAP `from`, applied at once, starting 0.05 s later; `motion/timelines/editorEntrance.ts`), which fires no resize or scroll. A reading of the painted box taken during it stays wrong; this caught the first version of the fix (sections 7 and 8);
+- the fit, the wheel and pinch zoom, the rubber band, snapping and the in-sheet SVG grid: they read rendered boxes or work in the sheet's own units inside its transform (INSPECTED); not affected;
+- `fit-check.mjs`'s claim Hr encoded the +24 px as the expected value; it is updated with this fix.
+
+**What these do not explain:** the out-of-bounds banner covering the top ruler, the bars covering classic scrollbars, the canvas's scrollbar style never applying (confirmer B's findings, Later); the unreadable marks at low zoom.
+
+## 7. Fix
+
+*As parked on 2026-09-30, with the parked tree's line numbers. Since the finish (section 11.3) the marks' layers are placed by their `left` and `top`, not by a transform, and placed again when the device pixel ratio changes; since the correction of the port's review (section 11.9) their place on the screen is what is rounded to whole device pixels (not their place in the bar), a reading a hair below a half rounding up; the feature graph's `WorkspaceRulers.tsx` entry has the current lines.*
+
+The design as it stands after the second step 10 review's follow-ups. (The step 10 review ran twice: first on the tree before cause C, section 9's "Independent review (step 10)"; then on cause C as redesigned, called here the second step 10 review.) The rulers move out of `PosterEditor` into `WorkspaceRulers.tsx` (the editor keeps one line, `<WorkspaceRulers canvasRef zoom gutterX gutterY />`, `PosterEditor.tsx:3281`), and they read where the sheet is instead of computing it. Line numbers below are `WorkspaceRulers.tsx`'s.
+
+- **A.** A reading is the box the page lays the sheet out in, against each ruler bar's own box: the top ruler's 0" goes at `slot.left − topBar.left`, in the bar's coordinates, and likewise for the left ruler (`readSheetInBars`, :75-96). The centring and the bars' inset are in the reading, so neither needs a formula. The scale stays `PX × zoom`, which H3 found right. The rulers read again in a layout effect after every render in which the zoom or the gutter changed (:277-279), and on every scroll of the canvas, from a scroll listener of their own (:239-240). The editor keeps its scroll state and its re-render on scroll only for the text editor's focus hint (section 6); it no longer passes the scroll in.
+- **B.** Each bar's length comes from the same reading, and the rulers also read again when the canvas, the sheet's frame or the workarea changes size (one `ResizeObserver` on the three, :226-245). The workarea was added after the step 9-F review (F-01): in WebKit with scrollbars that take space, the workarea was laid out narrower for a frame and moved the centred sheet while neither the canvas nor the frame resized, and a ruler stayed 5 px off at rest. On F-01's two named inputs (a size change from 24 × 36 to 48 × 36 in, and Fit after a pinch), the second step 10 review's R3 measured main 0 of 16 off and the fix without the workarea observed 16 of 16, the left ruler 5.01 px off (MEASURED by R3, WebKit with classic scrollbars, production build): on those inputs the defect was the fix's own, from reading the layout (causes A and B), not main's. The step 9-F reviewer's "4 of 48 on main" came from its other inputs, which were not re-run (UNVERIFIED). The observer and the scroll listener are both set up only where the browser has `ResizeObserver` (:228); without it the rulers follow neither a resize nor a scroll (the second step 10 review, R1-F11, INSPECTED).
+- **The slot, not the painted sheet.** The box read is the frame's parent, which is laid out where the frame is but which nothing transforms; the sheet sits at the frame's top-left corner. The first version read the sheet's painted box (`#poster-canvas`) and, to cover the entrance animation (which scales the frame and fires no event), kept reading on animation frames until the sheet was still for 2 frames. The sweeps caught that version off by up to 5 px in 5 of 203 fitted readings (section 8), so the painted box and the frame loop were replaced by the slot, which the animation never moves. For the 0.4 s of the entrance animation the rulers show where the sheet is settling, not where it is painted.
+- The dead `rulerTick` helper and the never-drawn 4 px mark (`inch % 1 === 0` is always true for an inch) go with the old code; the marks are drawn as before.
+- `fit-check.mjs`'s claim Hr expected the old +24 px on the filled axis; it now expects both 0" marks within 0.5 px of the sheet's corner.
+
+- **C.** A reading from the resize observer, or from the rulers' scroll listener, is put on the page before the observer or the event returns: each bar's marks sit in a layer of their own, and the reading moves the layer by a transform set right there (`place`, :183-190; the browser paints after them).
+  - **On whole device pixels.** The transform is rounded to the device-pixel grid (`Math.round(v × devicePixelRatio) / devicePixelRatio`). A browser does not snap a translate to the pixel grid as it snaps layout, and with the layer at a fractional pixel each 1 px tick was painted smeared over two device pixels: on 7 layouts (six at a device pixel ratio of 1, one at 1.5), 470 of 815 painted ticks in Chromium and 461 of 815 in WebKit, against 0 of 812 on main, whose ticks are placed by layout (the second step 10 review, R3-F1, MEASURED by R3's pixel judge). The rounding moves a tick by at most half a device pixel, 0.5 px at a ratio of 1: 0.51 px measured, in layout's 1/64 px units (R3's layout judge re-run by the lead, 33 layouts in five configurations). The committed judges' limit for a tick is therefore half a pixel plus layout's 1/64 px unit, 0.516 px: a crisp tick can sit no nearer a fractional edge. The measurements after the rounding are in section 9.
+  - **Which marks exist.** React renders only which marks exist (the state `drawn`): the marks across the canvas's whole scrollable content as it was at that reading, and a margin past each end of each bar of the bar's length, at most 600 px (`coveredSpan`, `MARGIN_PX`, :115-133; the cap from the step 9-D review, D-03). The content includes the scrollbars that take space, which the bars run over, and one pixel for a box's fractional width (the step 9-E review, E-01, :84-95). The marks are chosen again with a plain state update, at ordinary priority, when the content changes (a zoom, a resize, a size change) or the bars leave them (`stillCovered`, :147-152, and :223).
+  - **The synchronous path.** When a reading leaves a stretch of a bar, at either end of either bar, that the marks on the page do not cover (`covers`, :136-140), the bars would show a partly blank ruler for a frame or two (the step 9-D review, D-01). The rulers then render the new marks at once with `flushSync`, inside the observer or the event (:209-222). That flush also renders any update of the editor already waiting (the cost of the first design, which flushed every reading, S9C-02), so it is kept to uncovered readings. Three inputs reach it:
+    - leaving Preview after the window grew (D-01, the case it was built for);
+    - the window growing at the zoom floor, in width or in height alone (MEASURED by the second step 10 review's critic in Chromium: 1280 × 600 to 1280 × 2000 and 1000 × 800 to 2560 × 800 each took it once; R3 saw it only there and on D-01 in production);
+    - a scroll into content that grew with nothing the rulers observe resizing, such as a block nudged or dragged far off the sheet, then a jump to it (the second step 10 review, R1-F1 and R2-F1, MEASURED by them in Chromium's dev build: once per jump, 0 without the nudge or the drag; the editor rendered inside the scroll event only after a ruler toggle, 3 of 3 in R2's runs).
+
+    In React's own commit (the layout effect after a zoom or gutter change, `read(true)`) the rulers set their state plainly instead, since React refuses a flush there and renders the update before the frame is painted anyway (the step 9-E review, E-03; :219).
+  - **Hidden bars.** A reading from bars with no size (Preview hides the editor with the rulers still mounted) is ignored (:205): adopted, it left the rulers blank for a frame or two on the way back.
+  - The rulers no longer take the editor's scroll state, which was only a slower copy of the same event; the editor keeps it for the re-render the focus hint needs.
+  - The first design put every reading on the page with `flushSync` on the rulers' state. Its code review measured the cost: React's synchronous flush also rendered any update of the editor already waiting, inside the observer or the event (section 9, S9C-02 to S9C-04). The redesign renders nothing synchronously except on the uncovered readings above.
+
+## 8. Results after the fix
+
+*The paragraphs from here to "The first version, and why it changed" record the state before the step 9 review; the final numbers are under "Final run", below.*
+
+*Every at-rest figure in this section ("worst 0.02 px", "0 of 81" and the like) reads layout boxes, a mark's box against the sheet's box, not what is painted. The second step 10 review found the gap: with the marks' layers at a fractional pixel, ruler-check read 0 of 83 over 0.5 px (WebKit with classic scrollbars, worst 0.02 px, R3's run of it) while R3's pixel judge found 851 ticks painted smeared over two device pixels in 14 of 33 layouts in that configuration, and, in Chromium, the painted 0" up to 0.53 px off the painted sheet edge (R3-F1, MEASURED by R3). The layers are now rounded to whole device pixels (section 7); the readings after that, painted and layout, are in section 9 and under "Final run, after the second step 10 review" below.*
+
+**Tests red first (TESTED).** `rulers.test.tsx`, 5 tests (7 after the review), enters at the editor as a user opens it, scrolls it, and resizes the window. With the fix: 5 of 5 pass. With `PosterEditor.tsx` put back to main's (the fix's other files left in place): 4 of 5 fail, with the predicted numbers: the top ruler's 0" at 88 against the sheet's 64 (+24, H2), the left ruler's at 88 against 73 (+15: 24 less the 9 px centring, H1 + H2), after a scroll 169.67 against 145.67 (+24), and after a resize at a capped fit 88 against 470. The spacing control passes both ways.
+
+**Mutants (TESTED, `mutation-check.mjs`, `docs/fixes/04-rulers-match-sheet.mutants.json`).** Before the step 9 review: control 5 of 5; 5 of 5 mutants killed: the marks placed by the old formula (4 of 5 tests fail), the sheet measured against the canvas instead of each bar (4 of 5), the scroll not re-read (1 of 5), a resize not re-read (1 of 5), the editor not passing its scroll (1 of 5). Two blind spots jsdom cannot see go to the browser (below). One mutant, the scroll not re-read, first SURVIVED: jsdom runs animation frames, and the first version's frame loop picked the scroll up by the luck of timing. The test now runs with no animation frames, so every reading it sees comes from an event.
+
+**The browser, on a frozen copy of the fix (`fix4-frozen-1`; MEASURED).** `ruler-check.mjs`, all 79 scenarios, Chromium: 0 of 79 with a mark off by more than 0.5 px (worst 0.02 px), no stretch of bar over 0.99 in without a mark, 0 errors. Among them: as opened 0.01 px; the capped-fit resize and panel closing 0 px (bare stretch 0.88 in, against 11.96 and 4.96 in on main); Preview by its button and by Escape 0.01 px, the scroll kept at 216 px; the 20 % floor 0 px; the sidebar hidden 0.01 px; a device pixel ratio of 2, a 13.33 × 7.5 in slide and a 3 × 3 in sheet, 0.01, 0.02 and 0 px; the text editor's focus hint 3.99 px from its block after a 60 px scroll, as on main.
+
+Firefox, the same 79 scenarios (`POSTR_BROWSER=firefox`): 0 of 79, worst 0.01 px, no bare stretch over 0.99 in; Preview keeps the scroll at 216 px by both exits. WebKit (`POSTR_BROWSER=webkit`): 0 of 79, worst 0.02 px, no bare stretch over 0.99 in; Preview keeps the scroll, as in the other two.
+
+`fit-check.mjs` on the same copy: exit 0. Its ruler guard Hr reads 0 px on both axes in 88 of 88 fits (the first version: 2 of 88 off, up to 4.41 px), and fix 03's claims still hold (H1 0 of 88, H4 0 of 7, H5 0 of 2, H6 0 of 2, Ht 0 of 9 and the rest). Its INFO claims are unchanged from main and belong to other items: the keyboard reaching the hidden sidebar (H4k-sidebar, 2 of 2; the Later list) and block handles above the canvas's top edge (Hh, 4 of 12; item 19).
+
+**Blind spots in the browser (MEASURED, `blind-spot-check.mjs`, controls 2 of 2 passed).** Both guarded. Without observing the canvas, the rulers are 320 px off after the capped-fit resize and 160 px off after the panel closes. Reading the painted sheet instead of the slot, 9 of 13 scenarios go red, off by 6.94 px as opened and up to 18.07 px on the 60 × 30 fits (a mutant of the first version's frame loop had shown only 1 px, a weak guard).
+
+**The unit suite (TESTED).** 2978 of 2978 on the branch brought up to main (7f93b5b). On the branch's first base (`aee80ac`), 2976 of 2978: the two failures were the 10× ceiling test's known timeout on a loaded machine and the click it left in the next test, the CI failure fixed on main by 7f93b5b, not this change.
+
+**The first version, and why it changed.** The first version read the sheet's painted box and followed it on animation frames until it was still. Its Chromium sweep was off in 2 of 79 scenarios, both 60 × 30 in posters (4.13 and 5.03 px on the top ruler, 2.06 and 2.52 px on the left); fit-check's Hr, run on the same version, in 2 of 88 (up to 4.41 px); a repeat of the twelve 60 × 30 fits, 1 of 36. With the entrance animation switched off (probe mutant `no-entrance`), 0 of 36. Each error is 0.5 % of the sheet's size along its ruler, in the sheet's 2:1 aspect: a reading taken with the frame at a scale of 0.99 about its centre, the entrance animation's last moments (MEASURED). That the loop stopped during the animation's 0.05 s delay (applied at once, still for three frames, then moving) is INSPECTED from the timeline; 1 of 36 against 0 of 36 cannot tell the two arms apart on its own. The final version reads the untransformed slot, and all twelve 60 × 30 fits read 0.01 px in the sweep above.
+
+
+**Final run, after the step 9 follow-ups (MEASURED unless marked; frozen copy `fix4-frozen-3`, the branch at main `7f93b5b` plus the change).** `ruler-check.mjs`, now 81 scenarios (the desktop share view and a poster size change added): Chromium 0 of 81, Firefox 0 of 81, WebKit 0 of 81; the worst mark 0.02 px in Chromium and WebKit and 0.01 px in Firefox, and no bare stretch over 0.99 in anywhere. `fit-check.mjs`: exit 0; Hr 0 of 88, both 0" marks at 0 px in 88 of 88 fits; fix 03's H1 0 of 88. `blind-spot-check.mjs`: the one remaining blind spot (reading the painted sheet) guarded, its control passed. `mutation-check.mjs` on this fix's spec: control 7 of 7, 8 of 8 mutants killed (TESTED), and on fix 03's fit spec with `ruler-origin-96` retired: control 58 of 58, 14 of 14 killed (TESTED). The unit suite: 2980 of 2980 (TESTED).
+
+**Cause C, the first design (`flushSync`; MEASURED on `fix4-frozen-4`, the branch plus cause C; the step 10 measurers' instruments re-run unchanged, and the committed instrument's new per-frame mode).** Stale frames per event, fix / before cause C / main:
+- leaving Preview: 0 of 10 in Chromium, Firefox and WebKit / 10 of 10, 176 px / 0; in Chromium's captured frames 0 of 10 / 10 of 10 (2–3 frames, 125.6 px) / 0;
+- a size preset switch: 0 of 12 in all three / 12, 5 and 1 of 12, 47.7 px / 0; captured frames 0 / 12 of 12 (2–5 frames) / 0;
+- a zoomed version restore, and undo of a size change: 0 in all three / 8 of 8 and 3 of 3 / 0;
+- the guides panel closing at 1920 × 1080, and the sidebar hiding: 0 of 10 and 0 of 5 in all three / 10 of 10 (7–23 frames, up to 88 px) and 5 of 5 (up to 134 px) / 0;
+- pinch, 200 paced steps: 0 / 154 of 200, 83 px / 155–158 of 200 (main's own lag);
+- wheel: 0 of 80 in the page's own frames / 45 of 80 / 45 of 80; in Chromium's captured frames 10 of 10 events keep 1–2 frames the compositor draws before the page runs (30.5 px), as before cause C and on main;
+- Zoom in and out (control): 0 of 20 on all three.
+
+`ruler-check.mjs --frames` (new: 9 scenarios, sampled after the page's resize observers and before paint, each frame's ticks against the sheet's slot; controls: the sampler's self test, every frame sampled before its paint, the input changed the layout, the recording ended still): the fix green in all three engines; before cause C red on all 9 in Chromium and Firefox, and in WebKit on 7 (WebKit almost never paints the stale frame of a size switch or its undo: 1 of 12 and 0 of 3 before cause C, so those two claims cannot go red there); main, judged against its own rest (`--own-rest`), green on every trigger the fix caused and red on pinch and wheel, its own. Mutants on the fix: `reading-after-paint` turns all 9 red; `rulers-not-reading-scroll` turns only the wheel scenario red (a pinch step also resizes the frame, so the observer covers it).
+
+The at-rest checks after cause C: `ruler-check.mjs` 0 of 81 in all three engines (worst 0.02, 0.01, 0.02 px); `fit-check.mjs` exit 0, Hr 0 of 88; `blind-spot-check.mjs` 1 of 1 guarded; the text hint 3.99, 4.00 and 3.99 px after a 60 px scroll (3.99 before). Unit (TESTED): `rulers.test.tsx` 9 of 9, its two cause C tests red without the change (a resize read 250 against 470 px; a scroll 100 px behind); mutants 8 of 8 killed, 1 blind spot documented; two mutants retired with the code they changed (`scroll-not-followed`, `scroll-not-passed`), superseded by `rulers-not-reading-scroll`; the suite 2982 of 2982. Firefox logs "a scroll-linked positioning effect" once per page on the fix (INFO; its effect on paint not measured then. The second step 10 review's R3 measured it later with its own painted-frame judge, production build: a wheel scroll showed one lagging painted frame in 1 of 8 events in Firefox on the fix, against 2 of 8 on main; MEASURED by R3).
+
+**Cause C as redesigned (MEASURED on `fix4-frozen-7`'s sources; the design is in section 7, the reviews that shaped it in section 9).**
+- The per-frame instrument was corrected twice on the way. First, `ruler-check.mjs` and `lib/frameRecorder.mjs` took a mark's grandparent for its ruler bar; in the redesign that is the zero-size layer that holds the marks, so the judge saw only the 0" mark, and a first run read "0 of 10" for a version that was blank for frames on leaving Preview. Both now take the nearest clipping ancestor; on the older trees and main the two lookups return the same element (6 of 6, the step 9-D review). Found by falsifying a new scenario: the mutant that never chose new marks read green while the real code read red. Second, the judge counted a frame stale only for a ruler with no mark at all; it now also counts a stretch of bar over 1.05 in with no tick (the step 9-D review's D-02).
+- `ruler-check.mjs --frames`, 13 scenarios (the 9 above; a widening size switch; an instant scroll of 2.5 canvas heights at about 7.4×; the window growing from 800 × 700 to 2560 × 1440 at the zoom floor; a window grown while Preview hides the editor, then Escape), 42 events: 0 stale, 0 blank and 0 partly blank frames, 0 resize-observer loop errors, in Chromium (2086 frames), Firefox (2146), WebKit (1850) and Chromium with scrollbars that take space (`POSTR_SCROLLBARS=classic`, 2086).
+- Falsified in the browser: without the synchronous render for an uncovered bar, both window-growth scenarios go red (6 partly blank frames, up to 294 in); without ignoring readings from hidden bars, both Preview-exit scenarios go red (8 blank frames, before the partly-blank judge existed); without marks across the whole scrollable content, 4 of 4 far jumps show a blank ruler for a frame; without choosing marks again on a content change, 1 of 4.
+- The first design's cost is gone: with scrollbars that take space, a widening size switch raised "ResizeObserver loop completed with undelivered notifications" on 2 of 4 events with `flushSync` and on 0 of 4 now; in jsdom, after the rulers are hidden and shown, the first design rendered the whole editor inside 5 of 5 scroll events (0 of 5 before cause C), the redesign in 0 (a unit test).
+- At rest, `ruler-check.mjs`: 0 of 81 in all three engines (worst 0.02, 0.01, 0.02 px, no bare stretch over 0.99 in); main 81 of 81 observed with the corrected lookup (worst 24 to 622 px, up to 138 in).
+- The text editor's focus hint follows a scroll through the editor's own re-render, which nothing else now reads: `text-hint-follows-scroll` is a claim (the hint moves at most 0.73 px on a 60 px scroll; with the editor's scroll listener removed, 60 px; exit 1 in 2 of 2 runs, exit 0 without the mutant).
+- Marks at the zoom floor (the step 9-D review's counter, dev build): 2776 on a 2560 × 1440 window with a 96 × 96 in poster, 1976 at 1280 × 800 with 48 × 36 (main 1602 and 802; the redesign's first version 4724 and 2324); a zoom step there 99–149 and 106–131 ms (main 115–244 and 83–128); a pinch near the floor 0–2 frames over 50 ms per run (main 1–4).
+- Unit (TESTED): `rulers.test.tsx` 14 of 14. The jsdom stub now reports the canvas's scroll width and height (the sheet and its padding, or the canvas when they fit), and a hidden editor as every box 0 × 0. Against the first design, the S9C-02 test fails (1 editor render inside each scroll event); against the redesign's first version, the window-growth test and the mark-count bound fail; against the tree before cause C, 4 of the new tests fail. Mutants 15 of 15 killed, 2 documented blind spots (reading the painted sheet, guarded by `blind-spot-check.mjs`; the editor's scroll listener, guarded by `text-hint-follows-scroll` in the browser). The suite 2987 of 2987, twice.
+
+**Final run, after the second step 10 review (MEASURED unless marked; the branch at `0bea767`, cause C as committed, plus the rounding to whole device pixels and the review's follow-ups; dev server, the lead's run of 2026-09-30).**
+- `ruler-check.mjs` at rest, 83 scenarios: 0 of 83 in Chromium, Chromium with scrollbars that take space (`POSTR_SCROLLBARS=classic`), WebKit, WebKit with classic scrollbars and Firefox. The worst tick 0.51 px (Firefox 0.50) against the limit of 0.516 px, the rounding's half pixel measured in layout's 1/64 px units; the most drift along a ruler 0.03 px; no bare stretch over 0.99 in.
+- `ruler-check.mjs --frames`, 13 scenarios, 42 events: 0 stale frames in each of the five configurations, over 2063 recorded frames in Chromium, 2051 in Chromium classic, 1864 in WebKit, 1861 in WebKit classic and 2164 in Firefox (10,003 in all, of which 9934 were shown and judged); 0 resize-observer loop errors.
+- `ruler-sync-check.mjs`, 17 inputs: 0 off the expected path. D-01's input and R1-F1's (zoomed in 20, a block nudged 20 in down, a jump to the bottom) each took the synchronous path exactly once; the other 15 took it 0 times; React refused 0 flushes in a commit.
+- `fit-check.mjs`: exit 0. Hr 0 of 88 (the filled axis's 0" at 0 px in all 88, the other axis −0.39 to 0.50 px); fix 03's H1 0 of 88 and its other claims as before. Its INFO claims belong to other items: H4k-sidebar 2 of 2 and Hf-sidebar 1 of 1 (fix 03's Later list), Hh 4 of 12 (item 19).
+- `mutation-check.mjs` on this fix's spec (TESTED): control 24 of 24, 22 of 22 mutants killed, 6 documented blind spots (among them `zoom-read-passive` and `onpage-passive`, the second step 10 review's R1-F10, and `flush-in-commit` and `no-plus-one` from the step 9-E and 9-F reviews).
+- The unit suite (TESTED): 2997 of 2997 in 181 files; `tsc --noEmit` clean.
+
+## 9. Review of the fix
+
+### Code reviews (step 9)
+
+Round 1, on a frozen copy of the whole uncommitted change (`fix4-frozen-2`, main `aee80ac` plus the change), before any commit. Reviewer — scope: the whole change (the graph, the same assumptions elsewhere, correctness, security, test quality, comments, product rules, and the record's claims). It rebuilt the graph for the frozen tree (666 files, 8103 nodes; the three new files are untracked, so not in it).
+
+Findings: 3 MEDIUM, 10 LOW, nothing CRITICAL or HIGH. The two measurable MEDIUMs each got a skeptic with its own instrument, on the fix and on main; both REPRODUCED.
+
+Jev — shadow mode: 13 findings sent, 0 routed (the "review-finding" text format is not validated), 0 errors (`jev-route-findings.mjs`, jev-1.13.0). Nothing to audit.
+
+| finding | how it was checked | what was done |
+|---|---|---|
+| CR9-04-01 (MEDIUM): the rulers' observation of the sheet's frame is untested | REPRODUCED by its skeptic: after a new poster height at an unchanged fit, the left ruler −41.75 px off with the frame unobserved, 3 of 3 engines; the unit test and 0 of 79 scenarios noticed (MEASURED) | The test's resize fake now reports a resize only to the observers of the element that resized, and a new test enters through the height field and its dialog: mutant `frame-not-observed` killed, 1 of 7 tests (TESTED). New ruler-check scenario `size-change-48x36-to-48x30`: 0 px on the fix, −41.75 px with the mutant (MEASURED). |
+| CR9-04-02 (MEDIUM): fix 03's spec edits the ruler formula this change deletes, so the whole spec stops as a bad spec | REPRODUCED by its skeptic: exit 2 on the fix, 15 of 16 of the spec's mutants apply (MEASURED) | `ruler-origin-96` retired from `03-fit-whole-sheet.fit.mutants.json`, with a note in record 03; the spec runs again: control 58 of 58, 14 of 14 killed (TESTED). The skeptic found the same breakage already on main (fix 02's sheet spec, 3 stale mutants) and a shared cause: nothing checks that committed specs still apply. The port branch added `scripts/__tests__/mutantSpecs.test.mjs`, which checks every committed spec; it merged to main at `10ac9bb`, and this fix is merged onto it. |
+| CR9-04-03 (MEDIUM): the feature graph describes the replaced first design | INSPECTED: the entry named `#poster-canvas` and the frame loop; the file has neither | Rewritten, with current line numbers. |
+| CR9-04-04: the rulers lag a frame while the canvas animates | the reviewer's numbers (MEASURED by the reviewer); judged not caused by the fix (the scroll lag is main's too) | Recorded on PLAN.md's Later list. **Corrected by step 10:** the lag on the guides panel closing and the sidebar hiding is the fix's (main 0 of 10 and 0 of 5, counted against main's own rest; the step 9 probe's main control failed there, so it could not show it), and cause C fixes it; only the compositor's wheel frames stay on the Later list. |
+| CR9-04-05: the gutter trigger is untested | REPRODUCED: mutant `gutter-not-followed` survived 0 of 6 (TESTED) | New test: at a manual zoom, the canvas narrows below four gutters in one step with no window 'resize' event; the rulers' own resize reading then runs before the zoom hook commits the new gutter, so only the gutter trigger re-reads. Killed, 1 of 7 (TESTED). In Chromium, round 2 found no user entry where the mutant shows at rest (3 tried: a window narrowed at a manual zoom, the guidelines panel opening, the same with reduced motion; 0.01 px each, MEASURED by the reviewer): a window resize commits the gutter during its 'resize' event, before the resize observers. The test guards the code path. |
+| CR9-04-06: ruler-check calls a ruler with no marks an instrument error | REPRODUCED with a probe mutant that makes the rulers draw nothing: exit 2 (MEASURED) | A ruler with no marks now counts as the defect: exit 1 with the probe, 0 on the fix (MEASURED). |
+| CR9-04-07: fit-check's Hr passes when no marks exist | REPRODUCED with the same probe: exit 0 (MEASURED) | Hr counts no 0" marks after Fit as a regression: exit 1 with the probe, 0 on the fix (MEASURED). |
+| CR9-04-08: the test's fakes are simpler than a browser | REPRODUCED: `canvas-not-observed` survived 0 of 5 in jsdom (TESTED) | The resize fake is target-aware (above); the header says what the stub assumes; the scroll test zooms in first so the canvas can scroll. `canvas-not-observed` is now killed in jsdom, 1 of 7 (TESTED). |
+| CR9-04-09: the record claimed a desktop share-view check that did not exist | REPRODUCED: 0 / 0 px on the fix, +24 / −51.5 px on main (MEASURED, with a scenario added) | Scenario `share-desktop-1440x900`. |
+| CR9-04-10: two tables reduce the same scenarios differently, unlabelled | INSPECTED | Labelled per ruler, with the per-scenario figure beside it. |
+| CR9-04-11: stale comments | INSPECTED, each quoted and wrong | Updated, and two older comments that said the rulers carry `data-postr-overlay` (they never did; they sit outside `#poster-canvas`). |
+| CR9-04-12: PLAN.md's status row | INSPECTED | Updated. |
+| CR9-04-13: the 24 px thickness as a literal | INSPECTED | `RULER_PX`. The two bars' tick blocks stay separate: they differ in writing mode and label placement. |
+
+Round 2, the review of those follow-ups, on `fix4-frozen-3` (main `7f93b5b` plus the change), by the same reviewer with the same scope: nothing above LOW. It re-ran each follow-up's numbers on the fix and on main (ruler-check 0 / 0 against +24 / −61.5, +24 / −103.25 and +24 / −51.5; the mutants; fix 03's spec in three parts, 58 of 58 each), checked the test stub against Chromium's own layout (85.5, 127.25 and 59 px, the same), and found four LOW points, all acted on: the gutter test's claim holds only for a one-step resize with no window 'resize' event (scoped, in the test and above; CR9R2-04-01); the Later entry on the rulers' lag merged two scenarios and stated an inferred mechanism as fact (split and labelled; CR9R2-04-02); parts of sections 3 and 8 described the state before the review (labelled or updated; CR9R2-04-03); two feature-graph line numbers had shifted (CR9R2-04-04). Incidental, not this fix: with reduced motion requested, the guidelines panel still animates the canvas's width (MEASURED by the reviewer; the Later list).
+
+Found while fixing CR9-04-01: `ruler-check.mjs` computed inches from the poster size it opened with, so after a size change every mark looked up to 99.7 px off. It now reads the sheet's current size (MEASURED: after the size change, 0 px with 0.01 px of drift on the fix).
+
+### Independent review (the first step 10 review, on the tree before cause C)
+
+On `fix4-frozen-final` (the branch at `ec752cc`) against `main-frozen-4`, three reviewers with split scopes, a skeptic per finding above LOW, and a completeness critic (workflow `fix04-step10`, resumed once after a usage limit).
+- Reviewer R1 — scope: rounding, scaling and stability (device pixel ratios, page zoom, fractional windows, classic scrollbars, render loops, leaks, three engines).
+- Reviewer R2 — scope: the zoom and scroll controls end to end (every step, Fit, pinch, wheel bursts, keys, edges, round trips, the marks at the bars' ends and their labels).
+- Reviewer R3 — scope: sibling consumers and state changes (size fields and presets with undo and redo, templates, versions, Preview, print, the thumbnail, the share views, the ruler toggle, reload, another poster, the panel thresholds, the text hint).
+
+Findings: 1 MEDIUM, 8 LOW; nothing CRITICAL or HIGH. The clean results, all at rest: 3967 readings over steps, pinch, wheel, keys and round trips, 0 over 0.5 px (worst 0.025 px; main 3807 of 3807 off, worst 472 px); size, template and version changes 0.02 px or less in three engines (main 24–89 px off); Preview settled 0.01 px; the thumbnail carries no ruler pixels.
+
+| finding | checked | action |
+|---|---|---|
+| R3-01 (LOW, caused by the fix): leaving Preview paints a stale reading, taken while the editor was hidden, for 1–2 frames | REPRODUCED by skeptic G2 with its own instrument (Chromium frame capture): 10 of 10 exits, 2–3 frames, 125.6 px fitted and 176.4 px zoomed; main 0 of 10 | fixed, cause C |
+| R3-02 (LOW, caused by the fix): a poster size change that moves nothing else paints the old position for 1–2 frames | REPRODUCED by G2: a preset switch 12 of 12, 2–5 frames, 48 px; a zoomed restore 8 of 8; undo of a size change 8 of 8; main 0 each. PARTLY: R3's own restore setup changes the scroll, where main lags too (8 of 8, 216 px) | fixed, cause C |
+| R1-F1 (LOW, worse than main): with CSS `zoom` on the page, the rulers mix zoomed and unzoomed pixels (after zooming in at 1.25 or more, the left ruler 22–54 px off against main's 9–11) | the reviewer's numbers, 3 engines (MEASURED by R1); browser zoom (Ctrl/Cmd +/−) unaffected, emulated | handed on (Later): no user control sets CSS zoom; a page-zoom extension or an embedder would |
+| R2-01 (LOW, not caused): each pinch step draws the rulers off for 1–2 frames | the reviewer's numbers; G1 shows the fix's count equals main's (154 against 155–158 of 200) | fixed as a side effect of cause C (0 of 200) |
+| R2-02, R2-03, R2-04 (LOW, main too): Zoom in/out zoom about the scroll origin, not the view's centre; a pinch over the zoom bar page-zooms the browser; a 5-inch label pops in at a bar's start | the reviewers' numbers, the same on main | handed on (Later) |
+| R3-03 (MEDIUM, main too): Cmd/Ctrl+P in the editor prints the editor, rulers included, and the Export tab's steps tell users to press it | R3's measurement in Chromium (the same on main); no skeptic ran | handed on to PLAN.md as a new item (it is in the export path the MVP needs) |
+| R3-04 (LOW, main too): the text editor's focus hint stays behind when the sidebar hides or the window resizes | the reviewer's numbers, the same on main | handed on (Later) |
+
+Critic: 1 HIGH, 6 MEDIUM, 3 LOW gaps. HIGH G1: nobody had checked whether the lag findings share a cause, and two of them were the fix's. Tested (G1, below). MEDIUM: G2 the regressions rested on one instrument with no painted-frame check (done: skeptic G2, above); G3 the committed instruments read only at rest (done: `ruler-check.mjs --frames`, section 8); G4 cost under load, G5 the production build, G6 real Safari, G7 R3-03's triage (section 10). LOW: G8 R1-F1's premises, G9 untried entry points (the tour, a lint jump, a copy opened in the same editor), G10 the sibling list's INSPECTED claims (section 10).
+
+Jev — shadow mode: 9 findings sent, 0 routed, 0 errors (jev-1.13.0). Nothing to audit.
+
+**G1, the shared cause (MEASURED by its agent: the reviewers' instruments re-run unchanged, plus a sampler taken after the page's resize observers and before paint, checked against Chromium's own frame capture on 2186 still images, deviation at most 0.71 px).** One cause explains every stale frame the page itself paints: a reading reached the page through React state, which commits a task later, after the frame is painted. Applying it with `flushSync` inside the resize observer and a scroll listener brings every trigger to 0 in three engines (Preview exit, size switch, panel close, sidebar hide, pinch, wheel), and a targeted alternative (drop a hidden reading, add the frame size to the effect's deps) fixes only Preview and size and fails the unit suite in jsdom. What it does not explain: on a wheel scroll the compositor paints the scrolled sheet before the page runs any code (10 of 10 events, 1–2 frames, 30.5 px, the same on the fix before cause C and on main); no page code can remove it. Its cost: on a size switch the editor's pending render is pulled into the synchronous flush (Chromium 5 of 6 switches).
+
+
+### Code reviews of cause C (step 9)
+
+**The first design (`flushSync`), on `fix4-frozen-5`.** 0 stale frames on every trigger, in three engines (MEASURED by the reviewer), and nine findings:
+
+| finding | checked | action |
+|---|---|---|
+| S9C-01 MEDIUM: the mutant for cause A was killed only because the removed prop left `NaN` | the lead's run: 9 of 9 failures read "expected NaN" | the mutant rewritten; it now fails on the real offsets (24, 15, 39.5, 382 px), 0 NaN |
+| S9C-02 MEDIUM: React's synchronous flush also rendered any pending editor update inside the rulers' observer or scroll listener (20 of 20 scrolls after a ruler toggle) | the lead's jsdom probe through the real editor: 5 of 5 scroll events rendered the editor inside the event after a toggle, 0 of 5 before it; 0 and 0 before cause C | the redesign (section 7); a unit test |
+| S9C-03 LOW: a size switch's longest frame grew by one editor render (282 against 168 ms at 4× CPU) | same cause | the redesign; the step 9-D review then measured the fix and the tree before cause C equal (median 325.8 and 325.3 ms) |
+| S9C-04 LOW: with scrollbars that take space, a widening size switch raised "ResizeObserver loop completed" | reproduced with the harness's new classic-scrollbar mode: 2 of 4 events (the widening ones), 0 with hidden scrollbars | the redesign: 0 of 4 |
+| S9C-05 MEDIUM: nothing failed if the editor's scroll re-render (the text hint's) was removed | the reviewer's mutant | `text-hint-follows-scroll` made a claim (section 8) |
+| S9C-06 LOW: Firefox logs a scroll-linked positioning warning | — | noted; the rulers do write positions in the scroll event, which is the point |
+| S9C-07 LOW: stale docs and line references | INSPECTED | this write-up and the feature graph |
+| S9C-08 LOW: the recorder's header overstated the late sampler and cited a scratch folder | INSPECTED | corrected |
+| S9C-09 LOW: the cause C tests print `act()` warnings; a comment cited a retired mutant | the reviewer's run | comment corrected; the warnings are by design (the tests fire outside `act()` on purpose) |
+
+**The redesign, first version, on `fix4-frozen-6`.** S9C-01, 02, 04 and 05 confirmed gone (MEASURED by the reviewer with a React DevTools hook: 0 of 10 scroll renders and 0 of 28 size-switch renders inside a callback, against 10 of 10 and 12 of 62 with `flushSync`). Five findings:
+
+| finding | checked | action |
+|---|---|---|
+| D-01 LOW: after the canvas grows by more than twice the bar at an unchanged zoom, the rulers are partly blank for 1–2 frames (up to 294 in) | reproduced with the corrected judge: 1 frame, 294 in; 2 frames, 150 in on the Preview return; 0 with `flushSync` | the rulers render synchronously only when the bars would show a stretch the marks on the page do not cover (the second step 10 review found two more inputs that reach it: section 7); both scenarios committed |
+| D-02 MEDIUM: the per-frame judge could not see a partly blank ruler | the review's own judge against the committed one: 1–2 gapped frames each, 0 seen | the judge counts a stretch over 1.05 in with no tick |
+| D-03 LOW: three times main's marks at the zoom floor, and every zoom or pinch step there rendered them | the review's counter | the margin past each bar end capped at 600 px; a unit bound (off-bar marks at most 1.5 times those on the top bar in jsdom). Two of the reasons given here were wrong (the step 9-E review, E-04, and the lead's probe): in a browser at 1280 × 800, off-bar marks are 1.55 times those on the bars (1976 marks, against main's 802); and the sidebar does not move a bar end 484 px past the marks at once, since it animates (see step 9-E) |
+| D-04 LOW: a size switch's longest frame about 59 ms longer than main's | the review: equal on the fix and the tree before cause C, so causes A/B, not C; cause UNVERIFIED | section 10 |
+| D-05 LOW: stale comments and record text | INSPECTED | corrected |
+
+### Step 9-E: the review of the follow-ups
+
+On `fix4-frozen-7`. The reviewer used instruments of its own: a React DevTools hook counting renders inside the rulers' callbacks, a MutationObserver, and a late per-frame judge. Its numbers:
+
+- 0 bad frames in 17,257 judged frames, in Chromium (with overlay and with classic scrollbars), Firefox and WebKit.
+- D-01 fixed where it was built to be.
+- Two of the lead's claims were wrong: "no scroll can reach the synchronous path" and "the costs of S9C-02 stay away".
+
+Each finding was reproduced by the lead with a probe of its own. The probe is a served edit that counts entries into the synchronous branch, plus React's "flushSync was called from inside a lifecycle method" messages, in Chromium (MEASURED):
+
+| input | before, classic scrollbars | before, overlay | after, both |
+|---|---|---|---|
+| zoomed in 20, a scroll to the far end; the End key | 1; 1 | 0; 0 | 0; 0 |
+| at the far end, Hide sidebar | 1 | 1 | 0 |
+| at the far end, Fit | 2, and 1 flush inside a commit | 0 | 0 |
+| window 1280 × 800 → 1920 × 1080 at the fit | 1, and 1 inside a commit | 1, and 1 inside a commit | 0 |
+| Preview, window 2560 × 1440, Escape (D-01's case) | 2, and 1 inside a commit | 2, and 1 inside a commit | 1 |
+
+| finding | checked | action |
+|---|---|---|
+| E-01 MEDIUM (the fix's): the synchronous path ran where no tick could be missing. With scrollbars that take space, every scroll to the far end took it, and so did hiding the sidebar at the far end in every engine; each time it rendered the editor inside the event | the table above; and a unit test, red before the change (1 editor render inside the far-end scroll) once the jsdom stub was given scrollbars that take space (E-05) | the content reaches over the scrollbars the bars run over, plus one pixel for a box's fractional width (the reviewer's measured suggestion): the scrollbars' width and the fraction were missing from the reading |
+| E-02 MEDIUM (the fix's): on its designed case (leaving Preview after the window grew), the worst frame is 610 ms against 258 ms without the synchronous path (the reviewer's numbers, 4× CPU) | not re-measured by the lead; the step 9-F review reproduced it (597 against 250 ms) and corrected its cause (F-04 below) | accepted: one long frame on a rare path, in place of a partly blank ruler; the cost is in section 10 |
+| E-03 LOW (the fix's): a reading taken in React's commit (the zoom's layout effect) called flushSync there, which React refuses with a console error | the table above | the commit's own reading updates state plainly; React renders it before the frame is painted anyway. jsdom never reaches that path (E-05), so the unit tests cannot see it: a documented blind spot, falsified in the browser |
+| E-04 LOW (test gap): nothing guarded the margin from below | the reviewer's `e-margin-0` and `e-margin-300` survived | a unit test at the zoom floor (a canvas widened by the sidebar's width renders nothing inside the observer) kills a margin of 0. The lead then called a margin of 300 equivalent, from inputs at the fit and zoomed out only; that was wrong (F-03 below) |
+| E-05 INFO: the jsdom stub modelled only overlay scrollbars and the sheet | — | the stub takes a scrollbar width (used by E-01's test) |
+| E-06 INFO: the per-frame judge is sound | — | — |
+
+**After the changes (MEASURED, `ruler-check.mjs --frames`).** Every event is clean, and every control held:
+
+| configuration | events with a stale frame | partly blank frames | ResizeObserver loop errors | frames |
+|---|---|---|---|---|
+| Chromium, overlay scrollbars | 0 of 42 | 0 | 0 | 2,091 |
+| Chromium, classic scrollbars | 0 of 42 | 0 | 0 | 2,101 |
+| Firefox | 0 of 42 | 0 | 0 | 2,088 |
+| WebKit | 0 of 42 | 0 | 0 | 1,861 |
+
+**Mutants (TESTED).** Control 16 of 16; 17 of 17 killed, 4 documented survivors: the two blind spots as before, the margin of 300 (wrongly called equivalent: F-03), and the commit's flush, falsified in the browser (with it, the window grown at the fit and D-01's case each log React's error once; without it, 0).
+
+**Tests (TESTED).** 2989 of 2989.
+
+### Step 9-F: the review of the 9-E changes
+
+On `fix4-frozen-8`. The reviewer used instruments of its own: React's own render log with the callbacks on the stack, a late judge requiring a tick within 0.5 px of every whole inch, and the Long Animation Frames API. They covered the 9-E matrix, device pixel ratios 1.25 and 1.5, a canvas with only a horizontal scrollbar, and WebKit with scrollbars that take space.
+
+E-01 and E-03 were confirmed fixed:
+
+- **E-01:** with classic scrollbars, the synchronous path went from 18 inputs to 0; at the far end the content now ends 1 px past each bar in every configuration.
+- **E-03:** 0 lifecycle-flush errors over 981 inputs; its revert brings 9 back.
+
+Excluding WebKit with classic scrollbars, 0 stale, partly blank or blank frames of 42,115 judged.
+
+Each finding was reproduced by the lead before any change (MEASURED):
+
+| finding | reproduced | action |
+|---|---|---|
+| F-01 MEDIUM: in WebKit with scrollbars that take space, a ruler stayed 5 px off at rest after a size change or a Fit that adds a scrollbar and takes it away again. The reviewer counted 7 of 102 inputs on the fix and 4 of 48 on main; on the two inputs named here, main shows 0 of 16 (its rulers are off by a constant 61.5 px, not by this shift) and the fix without the workarea observed 16 of 16 (the second step 10 review, R3-F2, MEASURED by R3), so on these inputs it is not main's. WebKit laid the workarea out narrower for a frame and moved the centred sheet back, without resizing the canvas or the sheet's frame, so no observer of the rulers fired | two scenarios added to `ruler-check.mjs` (`size-change-24x36-to-48x36`, `fit-after-pinch`; the harness's classic scrollbars now also run in WebKit): both OBSERVED, the left ruler 5 px off; a unit test red first (the 10" mark 5 px off after the workarea alone resized) | the rulers also observe the workarea, which centres the sheet (the reviewer's measured suggestion): both scenarios pass, and the unit test |
+| F-02 LOW: nothing guarded the added pixel | a jsdom test with a canvas 0.4 px wider than its client box passed with and without it (the arithmetic lands on the covered side), so it was not kept; the lead's probe, now committed as `ruler-sync-check.mjs`: without the pixel, Hide sidebar at the far end, zoomed in 20, takes the synchronous path once, with overlay and classic scrollbars; with it, 0 | a documented blind spot of the unit tests, with those numbers |
+| F-03 LOW: the margin of 300 is not equivalent | the lead's probe, two runs: hiding the sidebar zoomed in 6 (1280 and 1920 wide, the middle and the far end) takes the synchronous path on 4 of 4 inputs at 300, 0 at 600 | a unit test (zoomed in, a canvas widened by the sidebar's width while its content goes from wider than its box to centred) kills 300; 500 survives it, so the unit bound is between 300 and 600; 600 stays |
+| F-04 LOW: E-02's cause was wrong. On a page where the rulers were never toggled, the long frame on leaving Preview is the rulers' own synchronous render at the old zoom (833 + 670 marks, 78.6 ms at 1×), not the editor. The editor is rendered inside only after a ruler toggle, when the rulers' observer is newer than the zoom's | not re-measured | the cause corrected above and in section 10; unmounting the rulers during Preview did not help (577 ms, the reviewer's) |
+| F-05 INFO: the unit tests enter by setting scroll positions and firing the stub's observer, where a user scrolls and the panels animate | — | noted; the browser checks are the ones that enter as a user does |
+
+**After the changes (MEASURED; `ruler-check.mjs` at rest and `--frames`, five configurations; every control held):**
+
+| configuration | at rest | events with a stale frame | partly blank frames | ResizeObserver loop errors | frames |
+|---|---|---|---|---|---|
+| Chromium, overlay scrollbars | 83 of 83 | 0 of 42 | 0 | 0 | 2,103 |
+| Chromium, classic scrollbars | 83 of 83 | 0 of 42 | 0 | 0 | 2,106 |
+| Firefox | 83 of 83 | 0 of 42 | 0 | 0 | 2,133 |
+| WebKit, overlay scrollbars | 83 of 83 | 0 of 42 | 0 | 0 | 1,848 |
+| WebKit, classic scrollbars | 83 of 83 | 0 of 42 | 0 | 0 | 1,855 |
+
+**Mutants (TESTED).** Control 19 of 19; 19 of 19 killed (new: the workarea not observed, the margin of 300), 4 documented blind spots (the two as before, the commit's flush and the added pixel, each falsified in the browser).
+
+**Tests (TESTED).** 2992 of 2992.
+
+### The second step 10 review (the independent review before merge, on the final design)
+
+On `fix4-frozen-9` against main (`7f93b5b`, and the tree before cause C, `ec752cc`), a workflow of three reviewers with split partitions, a skeptic per finding above LOW, and a critic (`wf_0bf2592f-9d4`):
+
+- **R1, code, tests and docs:** the diff against main, the unit tests under 16 mutants of its own, the instruments' own claims, the index docs against the code.
+- **R2, Chromium, the user's inputs:** 462 events and 14,165 frames judged per frame (keyboard, every preset's Fit, repeated switches, undo and redo of a size change, the tour, a lint jump, an opened copy, DPR 2 and 1.25, 640 × 700 and 2560 × 1440 windows, rapid resizes, the rulers hidden and shown), and costs against main.
+- **R3, Firefox, WebKit and a production build:** 33 layouts at rest in eight configurations, judged by layout and by painted pixels; per-frame painted frames from a screencast; F-01 again.
+
+Held (MEASURED by the reviewers): 0 stale frames over 14,165 in Chromium (R2); at rest 0 of 33 layouts over 0.5 px in each of eight configurations by layout (R3); the committed late sampler, run against the production bundle, 0 of 26 events stale in Chromium, Firefox, WebKit and WebKit with classic scrollbars (R3); no ResizeObserver loop error in any run; unit suite 2992 of 2992 and the spec 19 of 19 killed with its 4 blind spots (R1).
+
+| finding | checked | action |
+|---|---|---|
+| R3-F1 LOW (the critic: HIGH, no skeptic, and every committed judge blind to it): in Chromium and WebKit the ticks were painted smeared over two device pixels wherever the sheet sits at a fractional pixel, since a translate is not snapped to the pixel grid as layout is (944 of 5,631 painted ticks in Chromium, 935 in WebKit; main 0) | the critic, with its own screenshot judge: at the fit on 1280 × 800, the left ruler 55 of 55 ticks smeared at `translateY(125.5px)`, the top ruler 55 of 55 crisp at `translateX(40px)` | the marks' layers are placed on whole device pixels (red test at DPR 1, 1.25 and 2; `marks-off-pixel-grid` killed). MEASURED by the lead with R3's own judge, re-run on the production build of the rounded code, 33 layouts in each of five configurations (Chromium and WebKit with both kinds of scrollbars, Firefox): 0 smeared ticks of about 5,630 in each (was 944, 860, 935, 851 and 0); the worst painted tick 1.15 px in Chromium (was 1.36), 0.52 in WebKit (1.39), 1.14 in Firefox (1.14). A tick now sits up to half a device pixel from its layout position (0.51 px measured at DPR 1): the committed judges' limit is half a device pixel plus layout's 1/64 px |
+| R1-F2 MEDIUM (CONFIRMED by a skeptic with two instruments of its own): the feature graph's WorkspaceRulers entry described the design before cause C | the skeptic: 0 of 5 line anchors hold on the fix, 5 of 5 on `ec752cc` | rewritten |
+| R1-F1, R2-F1 LOW (the same finding from two reviewers): content that grows with nothing the rulers observe resizing (a block nudged far off the sheet), then a scroll into it, takes the synchronous path inside the scroll event; after the rulers are hidden and shown, the editor renders inside it once. Nothing wrong is drawn: the flush is what keeps the ruler covered | R1 1 of 1 and R2 3 of 3 (a drag), controls 0 | the comment, the record and `ruler-sync-check` corrected; the input added to `ruler-sync-check`, expected to take the path exactly once |
+| R1-F5 LOW, the critic's C3 MEDIUM: no test reached the left ruler's half or the bars' start end of the check that renders marks at once; the critic showed a height-only window growth at the zoom floor reaches the left half (1 flush on the fix; with that half removed, 62 in of the left ruler without a tick) | R1's mutants, 0 of 19 | two tests (a height-only growth, and a sheet the workarea moves past the margin); `covers-y-ignored` and `covers-start-ignored` killed |
+| R2-F2 LOW, the critic's C2 MEDIUM: each pinch step costs more with the fix | R2 in dev: per step 31 to 39 ms against 20 to 24 on main, yet total long-frame time lower (2,521 against 3,802 ms); the critic in production at 4× CPU: 8.5 against 6.4 ms per step, the longest frame over 50 ms in 5 of 6 runs against 2 of 6 | Later, with these numbers (section 10) |
+| C6 LOW (the critic): the number of marks grows with how far the content reaches, not only with the margin (a block parked 1,000 in off the sheet: 1,099 top marks at the fit, 143 without) | the critic's probe | Later (section 10) |
+| R1-F3, R1-F4, R1-F13, C4 LOW to MEDIUM: PLAN.md's Later list, record sections 3, 6 and 7, the instrument headers, and nine statements the reviews measured false | INSPECTED against the reviewers' numbers | corrected |
+| R1-F6, R1-F7 LOW and INFO: `ruler-sync-check` exited 1 on a crash, and passed D-01's input with the path not taken | R1's probes | a crash exits 2; a designed input must take the path exactly once |
+| R1-F10 INFO, the critic's C9: the two layout effects (the re-read on zoom, the record of the marks on the page) switched to passive effects pass every unit test | R1's mutants; the critic's per-frame probe: the re-read's mutant 0 stale samples over 12 zoom and resize events, and on Hide and Show sidebar, where its positive control went red | both in the spec as documented blind spots, with that evidence; the second not run in a browser (UNVERIFIED) |
+| R1-F11 INFO: without ResizeObserver the rulers would not hear scrolls either | tried as a test: the editor itself constructs ResizeObserver elsewhere and does not run without it | no change: no environment reaches it |
+| R1-F8, R1-F9 INFO: the per-frame judge reads the same layout slot the fix reads, and both judges read layout, not paint | R1's jsdom falsification | stated in the instruments' headers; the painted check is R3's (above) |
+| R3-F2 INFO: F-01 is not main's on its two named inputs (0 of 16 on main) | R3 | the record's wording scoped |
+| R2-I2 INFO: D-04 (a size switch's longest frame) did not reproduce at n = 6 | R2 | dropped from the Later list |
+| R3-F3, R3-F4, R2-I1 INFO: the Show-sidebar tab over the rulers' corner; the wheel's one lagging compositor frame (main's too, and less on the fix in Firefox and WebKit); the guidelines toggle over Fit at 640 px (item 21) | the reviewers | Later |
+| R3-F5 INFO: one Firefox screencast frame with both rulers at their old position during a resize | R3: 1 of 12 events in dev, 0 of 6 in production; the committed sampler 0 of 4 | UNVERIFIED (possibly a capture tear); Later |
+
+Jev — shadow mode: 35 findings sent (the three reviewers' 23 and the critic's 12 gaps), 0 routed (the "review-finding" format is not validated), 0 errors (`jev-route-findings.mjs`, jev-1.13.0, 2026-09-30).
+
+## 10. Limits and follow-ups
+
+*Rewritten for the port onto main (2026-10-16), updated by the correction of its review (2026-10-17, section 11.9). Each item says where its numbers come from; a number measured on the parked tree (main `7f93b5b` plus the change) and not re-measured since is labelled so. None blocks the MVP editor; they are on PLAN.md's Later list.*
+
+**Out of scope, by the bounded design (section 11.8):**
+- **The workspace grid's offset:** the dark grid around the sheet started at the canvas's corner, not at the sheet (5.58 and 10.33 px at the default window, up to 76 px; MEASURED on `7f93b5b`). Since record 29 the grid is not drawn (`ADJUSTMENTS_ENABLED` off): ruler-check's INFO `grid` reading is null in every scenario on `ac7d793` (MEASURED), so the offset shows nowhere today; it returns with the grid.
+- **The out-of-bounds banner over the top ruler** (22 of 55 marks hidden at 1280 × 800; MEASURED by both confirmers on `aee80ac`; not re-measured).
+- **Scrollbars that take space:** the ruler bars cover their first 24 px, and the canvas's own 10 px scrollbar style never applies in Chromium (MEASURED by confirmer B, emulated; native UNMEASURED).
+- **A tick every 2 px at the 20 % zoom floor:** a solid band, no label readable (INSPECTED from the floor's numbers; not looked at by eye).
+- **The pinch's cost:** each pinch step spends more time in the rulers than on main (production, 4× CPU: 8.5 against 6.4 ms per step, a frame over 50 ms in 5 of 6 runs against 2 of 6; MEASURED by the second step 10 review's critic on `7f93b5b`; the cause, a second render of the rulers at the new scale per step, UNVERIFIED).
+- **Units other than inches** (cm, pt): not offered.
+
+**Findings of the fix's reviews, still open (numbers from `7f93b5b` unless marked):**
+- **E-02:** leaving Preview after the window grew renders the rulers synchronously at the old zoom in one long frame: 597 against 250 ms without the synchronous path (dev build, Chromium, 4× CPU, the step 9-F review); in production 76–95 ms on the fix against 60–253 ms on main (R3 of the second step 10 review). The lever would be fewer marks rendered at the old zoom (UNVERIFIED).
+- **The margin (600 px):** its unit bound lies between 300 (fails) and 600; 500 passes the unit test and is unmeasured in a browser (TESTED).
+- **S9C-06:** Firefox logs a scroll-linked positioning warning; whether it is linked to a wheel scroll's lagging painted frame (1 of 8 events on the fix against 2 of 8 on main, R3) is not measured.
+- **S9C-09:** the cause C unit tests print `act()` warnings, by design.
+- **The number of marks:** it grows with how far the content reaches (a block 1,000 in off the sheet: 1,099 top-ruler marks at the fit, against 143; MEASURED by the second step 10 review's critic, single runs).
+- **R3-F5:** one Firefox screencast frame during a window resize showed both rulers at their old place (1 of 12 events in dev, 0 of 6 in production); UNVERIFIED, possibly a capture tear.
+- **R1-F1 of the first step 10 review:** with CSS `zoom` on the page (no user control sets it), the rulers mix zoomed and unzoomed pixels (MEASURED by that reviewer).
+- **The step 9-G review:** its findings other than CG-1 (the placement, settled in section 11.3) and R2P-F1 (the ratio change, measured in section 11.3) are known only by their names in the WIP commit (CG-2 to CG-8, R1G, R3G); their notes were not found (section 11.1). UNVERIFIED: nothing of them is claimed here.
+
+**Taken off this list by the port:**
+- **R3-F3** (the fixed Show-sidebar tab covered the rulers' corner and the first 2 in of the top ruler while the sidebar was hidden): since fix 12 the Show sidebar button sits in the top bar (16, 4, 36 × 36 px), 0 px² over either bar at 1024, 1280 and 1920 px in Chromium, Firefox and WebKit (MEASURED, `zoomed-in-3-sidebar-hidden-…`'s INFO reading, on the fix and on main). Fixed by fix 12's top bar, not by this fix.
+- **D-04** (taken off on 2026-09-30, kept off).
+
+**Main's own, found on the way (not caused by the rulers):**
+- **The browser's own File › Print of the editor page** (no key the app catches; ⌘P prints the poster) prints the editor page itself, the sidebar and the top bar with it (MEASURED by the review of the port under print media, R1-F3; the sidebar laid out and shown). Since the correction the rulers are hidden there (section 11.9); the rest of the page is main's. A print stylesheet for the editor chrome, or a `beforeprint` that hands over to the app's print, would cover it.
+- **The wheel:** the compositor paints the scrolled sheet before the page runs any code, for 1–2 frames (Chromium 8 of 8 events on the fix and on main, Firefox 1 of 8 against 2 of 8, WebKit 0 of 8 against 4 of 8; MEASURED by R3 of the second step 10 review on `7f93b5b`). The per-frame judge samples the page's frames and cannot see these. The one lever found is taking the marks off script positioning (`position: sticky` inside the scroller), UNVERIFIED.
+- **Zoom and pinch** (R2-02, R2-03, R2-04 of the first step 10 review, on `7f93b5b`): Zoom in and Zoom out zoom about the scroll origin, not the view's centre; a pinch over the zoom bar is not default-prevented; a 5-inch label pops in at a bar's start. Not re-measured on `ac7d793`.
+- **R3-04:** the text editor's focus hint stays behind when the sidebar hides or the window resizes (on `7f93b5b`; not re-measured).
+
+**Checks not run:**
+- **Real displays and inputs:** a real Retina screen, a window moved between displays of different density (the ratio change is emulated through DevTools), Windows at 125 % and 150 %, native Safari "always show" scrollbars and Windows' 17 px ones (the harness emulates 10 px ones), a trackpad's pinch (ctrl+wheel stands for it), a real browser zoom by Ctrl/Cmd +/− (emulated since the correction as Chromium's device scale factor 0.9, 1.1, 1.8 and 2.2 in `ruler-paint-check.mjs`, and Playwright's 0.67, 0.9 and 1.1 in `ruler-check.mjs`; that Chrome's page zoom paints as those do is INSPECTED, not measured). The manual flow §44 is for these.
+- **The browser-zoom ratios beyond Chromium's paint:** WebKit's and Firefox's painted ticks at 0.9, 1.1, 1.8 and 2.2 are not run; their layout is (`ruler-check.mjs` at 0.67, 0.9 and 1.1, section 11.9).
+- **Firefox's paint and its space-taking scrollbars:** `ruler-paint-check.mjs` does not run Firefox (it paints the scaled sheet about a device pixel off its layout box at ratios 1.25 to 2, R2P-F5), and the judge's known answer cannot be read there: each marks' layer moved half a device pixel by a translate reads crisp in Firefox, which paints the translated layer snapped (R1-F2 of the port's review, MEASURED by its reviewer and again by the correction: 0 of 55 and 0 of 52 ticks smeared at emulated 1, 1.25 and 2, where WebKit reads all of them smeared, section 11.9). A control Firefox cannot snap (a layer scaled by a non-integer factor) would be needed; until then Firefox's painted ticks are manual-test-flows §44's. Playwright's Firefox draws no scrollbars that take space.
+- **The entrance animation, frame by frame:** for its 0.4 s the rulers show where the sheet is settling, not where it is painted (section 7); the per-frame judge reads the same layout slot the rulers read, so it cannot see that (R1-F8); at rest, `as-opened-1280x800-48x36` reads it after the animation.
+- **What the committed judges cannot see:** `ruler-check.mjs` (at rest and per frame) reads layout boxes, never paint; `ruler-paint-check.mjs` reads paint at rest only. A bar at opacity 0 or covered, a tick's line drawn away from its box, and a bar that ends short with its marks right read clean to the layout judges (R1-F9).
+- **A production build per frame in Firefox and WebKit:** the production build was run in Chromium only (section 11.4).
+
+### The list as parked (2026-09-30), kept
+
+*What section 10 said when the branch was parked; superseded by the lists above, kept for its history.*
+
+**Later list** (none blocks the MVP editor; PLAN.md "MVP scope and the Later list"):
+
+**Findings of the fix's reviews:**
+
+- **E-02:** leaving Preview after the window grew renders the rulers synchronously at the old zoom, in one long frame. Dev build: 597 ms against 250 ms without the synchronous path (Chromium, 4× CPU, the step 9-F review's numbers). Production build: the longest frame 76–95 ms on the fix (medians 82 and 86 over two rounds of 5) against 60–253 ms on main (medians 122 and 70) (Chromium, 4× CPU, Long Animation Frames; MEASURED by the second step 10 review's R3, on its build from before the rounding to device pixels). The lever would be fewer marks rendered at the old zoom (UNVERIFIED).
+- **The margin (600 px):** its unit bound lies between 300 (fails) and 600. 500 passes the unit test and is unmeasured in a browser.
+- **S9C-06:** Firefox logs a scroll-linked positioning warning. Separately, a wheel scroll showed one lagging painted frame in 1 of 8 events in Firefox on the fix, against 2 of 8 on main (production build; MEASURED by the second step 10 review's R3); whether the two are linked is not measured.
+- **S9C-09:** the cause C tests print `act()` warnings, by design.
+- **The pinch's cost (the second step 10 review, R2-F2 and its critic's C2):** each pinch step spends more time in the rulers than on main: in production at 4× CPU, 8.5 ms against 6.4 ms per step in the wheel listener, and a frame over 50 ms in 5 of 6 runs against 2 of 6 (MEASURED by the critic); in the dev build the total long-frame time was lower on the fix (2,521 against 3,802 ms, MEASURED by R2). The cause (a second render of the rulers at the new scale per step) is UNVERIFIED.
+- **The number of marks (the critic's C6):** it grows with how far the content reaches, not only with the margin: a block parked 1,000 in off the sheet gives 1,099 top-ruler marks at the fit, against 143 with none (MEASURED by the critic, single runs); the synchronous flush at the floor then renders 1,627 to 1,848 marks in 94 to 97 ms.
+- **R3-F3:** the fixed Show-sidebar tab covers the rulers' corner and the first 2 in of the top ruler while the sidebar is hidden (main's tab too).
+- **R3-F5:** one Firefox screencast frame, during a window resize, showed both rulers at their old place (1 of 12 events in dev, 0 of 6 in production; the committed sampler 0 of 4); UNVERIFIED, possibly a capture tear.
+- **R1-F1 of the first step 10 review:** with CSS `zoom` on the page (no user control sets it), the rulers mix zoomed and unzoomed pixels (after zooming in at 1.25 or more, the left ruler 22–54 px off against main's 9–11; MEASURED by that reviewer).
+
+Taken off this list: **D-04** (a size switch's longest frame about 59 ms longer than main's). The second step 10 review's R2 did not reproduce it at n = 6 per tree: the longest frame's median 367.5 ms on the fix against 368.5 ms on main (dev build; MEASURED by R2, R2-I2).
+
+**Checks not run:**
+
+- **Scrollbars:** native Safari "always show" scrollbars and real Windows 17 px scrollbars; the harness emulates 10 px styled ones. Firefox with space-taking scrollbars, which Playwright's Firefox does not draw.
+- **Other inputs:** browser zoom by Ctrl/Cmd +/− (device pixel ratios 1.25 and 1.5 were used); right-to-left layout (the app sets no direction).
+- **Builds:** production-build timings were run only in part, in the second step 10 review: E-02 by its R3 (above), and a pinch by its critic (Chromium, 30 ctrl+wheel steps at 4× CPU, 6 reps each: the median time in the wheel listener per step 8.5 ms on the fix against 6.4 ms on main, and a frame over 50 ms in 5 of 6 fix reps against 2 of 6 on main; MEASURED by the critic, on R3's build from before the rounding). Every other timing is from the dev build.
+- **What the committed judges cannot see:** `ruler-check.mjs` at rest and `--frames`, with `lib/frameRecorder.mjs`, read layout boxes, never paint. A bar that ends short of the canvas with its marks right, a tick's line drawn away from its box, a bar at opacity 0 or covered, and a tick smeared over two device pixels all read clean; a missing interior mark reads as an instrument error (exit 2), not as the defect (R1-F9, MEASURED by the second step 10 review's R1 on synthetic rulers in jsdom). R3-F1's smeared ticks were in that blind spot (section 8). The per-frame judge measures against the sheet's layout slot, the box the rulers read, so it cannot see the rulers disagree with a painted sheet that has left its slot (today only during the entrance animation): with the painted sheet 8 px off its slot, rulers placed on the slot read clean per frame and 8 px off at rest (R1-F8, MEASURED by R1 in a jsdom model). No paint-level check is committed; both blind spots are in the instruments' headers.
+
+**Main's own, found on the way:**
+
+- **The wheel:** on a wheel scroll the compositor paints the scrolled sheet before the page runs any code, for 1–2 frames (no page code can remove it). Painted frames in production, per wheel event: Chromium 8 of 8 on the fix and 8 of 8 on main, Firefox 1 of 8 against 2 of 8, WebKit 0 of 8 against 4 of 8 (MEASURED by the second step 10 review's R3). The only lever found is taking the marks off script positioning (for example inside the scroller with `position: sticky`), UNVERIFIED.
+- **Zoom and pinch (R2-02, R2-03, R2-04):** Zoom in and Zoom out zoom about the scroll origin, not the view's centre; a pinch over the zoom bar page-zooms the browser; a 5-inch label pops in at a bar's start.
+- **R3-04:** the text editor's focus hint stays behind when the sidebar hides or the window resizes.
+- **The workspace grid:** it starts at the canvas's corner, not at the sheet (5.58 and 10.33 px).
+- **At the zoom floor:** a mark every 2 px.
+- **Classic scrollbars:** the ruler bars cover the first 24 px of them, and the canvas's own scrollbar style never applies in Chromium.
+- **The banner:** the out-of-bounds banner covers the top ruler.
+
+**The first step 10 review's critic's gaps:** G4 cost under load, G5 the production build, G6 real Safari, G8 R1-F1's premises, G9 untried entry points (the tour, a lint jump, a copy opened in the same editor), and G10 the sibling list's INSPECTED claims.
+
+**New plan items (MVP):** Cmd/Ctrl+P prints the editor, rulers included, and the Export tab tells users to press it (R3-03, PLAN.md item 24).
+
+**Evidence outside the repository:** the reviewers' and confirmers' instruments ran from the fix's scratch folder and are not committed; their numbers here are what they reported. The committed instruments are:
+
+- `ruler-check.mjs`, at rest and `--frames`, with `lib/frameRecorder.mjs`, and scrollbars that take space in Chromium and WebKit;
+- `ruler-sync-check.mjs`, which counts the rulers' synchronous path and React's refused flushes, and serves a mutant with `--mutant`;
+- `fit-check.mjs`;
+- the unit tests and the mutants spec.
+
+`ruler-sync-check.mjs` on the fix before the second step 10 review's follow-ups (Chromium, MEASURED): the synchronous path taken only on D-01's input, once, and 0 refused flushes over 16 inputs. With `--mutant no-plus-one`, `flush-in-commit` or `margin-300`, it fails on 1, 2 and 4 inputs. Those 16 inputs did not include the two others the second step 10 review found taking the path once, as designed: a scroll into content that grew with nothing the rulers observe resizing (R1-F1, R2-F1), and the window growing at the zoom floor (section 7). The script now drives the first as its `content` input, and fails unless each designed input takes the path exactly once (17 inputs, INSPECTED from its source); no input of it drives the second. No run of that version is recorded in this section.
+
+## 11. The port onto main and the finish (2026-10-16)
+
+The owner un-parked item 4 on 2026-10-16 ("start them now"), reversing the hide of 2026-09-30 and the MVP design doc's §3.14 ("stays parked"; both docs now say so). This section brings the parked work onto main `ac7d793`, reproduces the defect there with the rulers switched on, finishes the half-done change the WIP commit left, and re-measures every claim on this tree.
+
+### 11.1 How the work came over
+
+`git merge --squash editor/rulers-match-sheet` on `fix/04-rulers` (at `ac7d793`): git's three-way merge of the branch's eight commits (`b9ed058` … `cc1b139`) against their base `7f93b5b`, landed as one commit, which is what the lead asks for (one WIP commit per stage). A cherry-pick of eight commits would have met the same conflicts eight times, in files the later commits rewrite; a plain port by copying files would have dropped the branch's edits to files main has since changed. The branch's commits stay on the local branch and are cited by hash; nothing on it was changed.
+
+New files came over whole (`WorkspaceRulers.tsx`, `rulers.test.tsx`, `ruler-check.mjs`, `ruler-sync-check.mjs`, `ruler-paint-check.mjs`, `lib/frameRecorder.mjs`, `lib/rulerPaint.mjs`, this record and its spec). Six files conflicted, each resolved by hand (INSPECTED):
+
+| file | main since `7f93b5b` | resolution |
+|---|---|---|
+| `PosterEditor.tsx` | fix 12's one undo history sits where the rulers' scroll state was; record 30's one print path replaced the clone code whose comment the branch had corrected | main's undo history kept; the branch's scroll comment (the state kept only for the text hint's re-render); main's print path kept (it calls `stripEditorChrome`) |
+| `data/thumbnails.ts` | the capture calls `stripEditorChrome` (fix 13c) | main's call, its comment corrected: it said the strip takes out "the rulers", which are never in the copy (`#poster-canvas` holds no ruler, §11.4 X3). The same false line in `export/stripEditorChrome.ts`'s header corrected too |
+| `scripts/lib/editorHarness.mjs` | `b6f4604` (2026-10-05) already brought fix 04's harness work to main, and records 27–30 added the build, the switches and `prepare` | main's file as it is: a superset (every export the ruler instruments use is there, INSPECTED) |
+| `scripts/fit-check.mjs` | the switches, the skipped share control, Hr's "not measured" line | main's file with the branch's Hr (both 0" marks within 0.5 px + 1/64 px after Fit, no 0" mark counted as a regression), counted only where the tree shows the rulers (`sourceFlag('RULERS_ENABLED')`); claim Hh's note updated |
+| `docs/feature-graph.md`, `docs/stress-test/PLAN.md` | rewritten by every fix since | main's text, with the ruler entries edited (§11.7) |
+
+`docs/fixes/03-fit-whole-sheet.md` and its fit spec merged cleanly: the retired mutant `ruler-origin-96` (CR9-04-02) stays retired.
+
+What main changed that the rulers meet, and what each needed (INSPECTED unless a number is given):
+- **Fix 12's top bar** (44 px, above the editor's row): the rulers sit in the canvas stage, under it; nothing to change. Every browser gate below runs with it on the page.
+- **Fix 19's controls** (a handle row 38 px above its block, the same at every zoom): the rulers' bars are where they were on main, so they cover what they covered there (§11.4, controls).
+- **Fix 29's switches**: `EDITOR_EXTRAS_ENABLED` is off, so there is no guidelines panel: every instrument's panel scenarios are skipped on such a tree, printed "skipped (switch off)" (`switchesOff`, the harnesses' one way); `ADJUSTMENTS_ENABLED` is off, so the layout tab's "📐 Canvas overlays" section now holds only "Show ruler", and its line reads "A visual aid only — it never prints or exports." (a test asserts it, `mvpHidden.test.tsx`); the dark workspace grid is not drawn (ruler-check's INFO `grid` reading: null in every scenario).
+- **Fix 30's print path**: the print copy is `#poster-canvas` through `stripEditorChrome`; the rulers are outside it (§11.4, X1–X3).
+- **Fix 33's top-bar control and fix 36's keys**: the rulers take no input; nothing to change.
+- **`RULERS_ENABLED`** stays the switch (`config/features.ts`), now `true`. `rulersHidden.test.tsx`, which locked the hidden state, now mocks the switch off and checks what it hides.
+
+**The step 9-G review.** The WIP commit `cc1b139` names a follow-up review ("step 9-G": CG-1 to CG-8, R1G, R2P and R3G findings) whose notes were kept in a scratch folder (`fix4-review/step9-G`) that is not on this machine any more (searched under the development folders and the scratch areas, 2026-10-16: not found). What is known of it is what the WIP code, its comments, the spec and the commit message carry: the layers rounded to whole device pixels and re-placed on a device-pixel-ratio change (R2P-F1), a half-finished switch from a transform to left/top placement (CG-1), a first `ruler-paint-check.mjs`, the judges' limit at 0.5 + 1/64 px. Its numbers quoted in the code's comments are UNVERIFIED until re-measured below.
+
+### 11.2 Reproduced on main `ac7d793`, the rulers switched on
+
+A detached copy of main `ac7d793` with one change, `RULERS_ENABLED = true` (`rulers-main-on`, not committed), measured by this tree's instruments (run from that copy's `apps/web` with `POSTR_REPO` set to it). Main's rulers are the old inline ones in `PosterEditor.tsx`, which keep their own copy of the layout (cause A) and read the canvas's size only when the editor renders (cause B).
+
+`ruler-check.mjs` at rest (MEASURED; the share view skipped while sharing is hidden, 51 guidelines-panel scenarios skipped while `EDITOR_EXTRAS_ENABLED` is off; Chromium ran before the 12 controls readings were added, which ran in their own Chromium run, below):
+
+| engine | scenarios with a mark over 0.516 px | 0" marks over 0.5 px | worst mark | drift along a ruler | residual after H1 + H2 | a stretch of bar over 1.02 in with no mark |
+|---|---|---|---|---|---|---|
+| Chromium | 79 of 79 | 147 of 147 | 875 px (131 in at the zoom floor) | ≤ 0.02 px | ≤ 0.02 px | 23 of 79, up to 46.23 in |
+| Firefox | 91 of 91 | 171 of 171 | 875 px | ≤ 0.01 px | ≤ 0.01 px | 23 of 91 |
+| WebKit | 91 of 91 | 171 of 171 | 875 px | ≤ 0.02 px | ≤ 0.02 px | 23 of 91 |
+
+At the three widths of the gate, 48 × 36 in after Fit, the sidebar shown: 1024 × 768, the top ruler's 0" +24 px and the left's −119.5 px; 1280 × 800, +24 and −39.5 px (−61.5 on `7f93b5b`: fix 12's 44 px top bar shortened the canvas and moved the centred sheet); 1920 × 1080, −24.67 and +24 px; the same in all three engines. The bare stretches are all cause B: the 20 fits with the sidebar hidden first (`fit-…-nosidebar`), hiding the sidebar after Fit (12.33 in), and the two capped-fit resizes (11.96 in). H1 + H2 still explain every offset to 0.02 px (the residual), and H3 holds (the drift), so the causes of section 6 are unchanged by main's moves (MEASURED).
+
+`ruler-paint-check.mjs` on the same copy (MEASURED): 183 of the 257 layouts it could judge have a defect, every one of position: the painted 0" up to 589 device px from the sheet's painted edge at a ratio of 1 and 1,176 at 2, in Chromium and in WebKit at whole ratios; 0 of 25,945 ticks smeared (main's ticks are placed by layout, each at its own fractional `left`, so the browser snaps them). Its controls cannot run on main: they move the marks' layer, which main's rulers do not have (the bar itself moved, and the 0" was not read), so the 8 control layouts are errors (exit 2), and main's position numbers rest on controls that held only on this tree (11.3).
+
+Per frame (`--frames --own-rest`, main judged against its own rest) and `fit-check.mjs`'s Hr on main are with the results after the change, in 11.4, beside the fix's.
+
+### 11.3 The finish: layout or a transform, decided by paint
+
+The WIP commit left `place()` half-way through a switch (the step 9-G critic's CG-1): the marks' layers were moved by a translate (`transform: translateX(…)`), rounded to whole device pixels since R3-F1, and CG-1 said that a browser snaps layout to its device-pixel grid when it paints but does not snap a script-set translate, so the ticks could still be painted smeared after a change of ratio and in WebKit at fractional ratios. The WIP had already written the layers' `left` and `top` instead, with the rounding kept and a listener for the ratio, and its tests and spec were "not known to pass".
+
+On this tree, before any decision: the unit tests 30 of 30 (TESTED), the spec 27 of 27 killed with 7 blind spots, control 30 of 30 (TESTED, `mutation-check.mjs`); `transform-placed`, the mutant that puts the translate back, is one of the blind spots (the tests read each layer's effective offset, which a rounded translate gives exactly as layout does). So nothing in jsdom tells the two apart, and the choice was made by `ruler-paint-check.mjs` (committed with the WIP, never run before): the same 281 scenarios (16 of them the guidelines panel's, skipped) on this tree as it is, and with `POSTR_MUTANT=…#transform-placed`.
+
+`ruler-paint-check.mjs` reads the ticks as painted, from screenshots at the device's own pixels: a tick with a device column (or row) only partly covered is smeared over two device pixels; `off0` is the painted 0" tick's leading edge less the sheet's painted edge; `tick` is each tick against its inch on the painted sheet. Chromium runs at its own ratios (`--force-device-scale-factor` 1, 1.25, 1.5, 2), WebKit at emulated ones, and five changes of ratio in mid-session (DevTools, emulated). Its controls held in every configuration of both runs (exit 0 and 1, 0 errors): layers set half a device pixel off read smeared, a layer or the sheet moved by one device pixel reads one pixel later or earlier (MEASURED):
+
+| configuration | layout (this tree): layouts with a defect, ticks smeared, worst `off0` / `tick` (device px) | a rounded translate (`transform-placed`) |
+|---|---|---|
+| Chromium at 1, 1.25, 1.5, 2 | 0 of 30 each; 0 of 3,074–3,079 each; `off0` ≤ 0.011, `tick` ≤ 0.518 | the same, to the tick |
+| WebKit at 1 and 2 | 0 of 30 each; 0 of 3,075 and 3,078; `off0` ≤ 0.001, `tick` ≤ 0.522 | the same |
+| WebKit at 1.25 | 0 of 30; **0 of 3,078** | **27 of 30; 226 of 3,078 smeared** |
+| WebKit at 1.5 | 0 of 30; **0 of 3,078** | **24 of 30; 121 of 3,078 smeared** |
+| five ratio changes (2→1, 1.25→1, 1.5→1, 1.5→2, 1.25→2) | 0 of 5 each; 0 of 495 each | the same (the ratio listener re-places the layers either way) |
+| in all | **0 of 265 layouts, 0 of 27,093 ticks** | 51 of 265, 347 ticks |
+
+(16 more layouts are the guidelines panel's, skipped. At WebKit's fractional ratios, and after a change to an emulated 2, `off0` and `tick` are printed, not counted, because those paint the sheet itself up to a device pixel, or a CSS-rounded place, off its layout box (R2P-F4, R2P-F5); there `off0` reaches 0.81 device px on both at WebKit 1.25, and after a change to 2 it reaches 2.01 by layout against 1.01 by the translate: an emulated ratio of 2 reached by a change paints the sheet at a CSS-rounded place, so neither number is a ruler's error (UNVERIFIED on a real display).)
+
+**Decision: the marks' layers are placed by layout** (`left` for the top ruler, `top` for the left one), rounded to whole device pixels, as the WIP had begun; the transform is not kept. It paints the same as a translate everywhere but WebKit at fractional ratios, where only layout is crisp. CG-1's other count, smearing after a change of ratio with the translate rounded (651 of 1,275, the critic's), is not reproduced here: with the ratio listener the translate re-places the layers too (0 of 2,475); without the listener (the mutant `dpr-change-ignored`, the five changes, 25 layouts), the ticks stay crisp (0 of 2,475 smeared) but sit on the old grid's rounding: 7 of 25 layouts with the painted 0" up to 1.005 device px from the sheet's painted edge and a tick up to 1.245 device px from its inch after a change to a ratio of 1. So the listener keeps the position, and layout keeps the ticks crisp. The mutant `transform-placed` stays a blind spot of the unit tests and is now guarded in the browser by three of those WebKit layouts (section 11.5). The comments in `WorkspaceRulers.tsx` that quoted the 9-G review's numbers now quote these.
+
+### 11.4 Results after the change (this tree, `ac7d793` plus the change)
+
+**At rest, `ruler-check.mjs`** (MEASURED; the same skips as in 11.2):
+
+| engine | scenarios with a mark over 0.516 px | 0" marks over 0.5 px (the most) | worst mark | a stretch of bar over 1.02 in with no mark (the longest) |
+|---|---|---|---|---|
+| Chromium | 0 of 79, and 0 of 21 in the runs of the readings added after it | 0 of 145 (0.50 px) | 0.51 px | 0 (0.99 in) |
+| Firefox | 0 of 91 | 0 of 169 (0.50 px) | 0.50 px | 0 (0.99 in) |
+| WebKit | 0 of 91 | 0 of 169 (0.50 px) | 0.51 px | 0 (0.99 in) |
+
+By the gate's widths (WebKit; the other two the same to 0.01 px): 1024 px, 18 scenarios, worst 0.51 px; 1280 px, 37, 0.51 px; 1920 px, 18, 0.51 px; the sidebar hidden (before Fit, after it, hidden and shown), 38, 0.51 px. A 0" mark at 0.50 px is the rounding to a whole device pixel at a ratio of 1 (section 7): on the painted screen the 0" sits 0.005 device px from the sheet's painted edge (11.3). The text editor's focus hint follows a 60 px scroll to 0.69 px (WebKit; claim `text-hint-follows-scroll`, limit 2 px).
+
+**Per frame, `ruler-check.mjs --frames`** (MEASURED): 19 scenarios, 17 of which run here (the other two close the guidelines panel), 102 events in each engine, among them the gate's matrix (66 events: each of 11 inputs at 1024, 1280 and 1920 px, the sidebar shown and hidden, the top bar on the page):
+
+| engine | events with a stale frame | frames shown and judged | blank or partly blank ruler frames | ResizeObserver loop errors |
+|---|---|---|---|---|
+| Chromium | 0 of 102 | 5,080 | 0 | 0 |
+| Firefox | 0 of 102 | 5,033 | 0 | 0 |
+| WebKit | 0 of 102 | 4,413 | 0 | 0 |
+
+Every control held (the sampler's known answer, each frame from its own rendering update, the input changed the layout, the recording ended still, the slot and the painted sheet within 0.5 px at rest after each event). The matrix's first run in each engine stopped on its own control at 1024 px with the sidebar shown: the wheel event found no room to scroll (a width-limited sheet whose height fits the canvas), so the input did not change the layout (exit 2, no stale frame among its other 10 events); its `before` now zooms in until the canvas scrolls, and the six matrix scenarios were run again in each engine (the numbers above). **The matrix can go red:** with the mutant `reading-after-paint` served (the reading put on the page a task later, as before cause C), 4 of 11 and 5 of 11 events of two matrix scenarios are stale in Chromium (the pinch, 11 and 13 frames; the wheel, 1 frame, 40 px; the window growing, 57 and 73 px; the sidebar toggled, 18 frames, 87.4 px; the size change undone, 3 frames, 198.3 px; exit 1).
+
+Main with the switch on, per frame and judged against its own rest (`--own-rest`, since its marks are off at rest; MEASURED): 42 of 102 events stale in each engine (Chromium 465 stale frames, Firefox 499, WebKit 417), 291 to 353 of them partly blank (cause B), up to 1,890 px on the far jump; in the matrix the pinch 6 of 6, the wheel 6 of 6 (one frame, 40 px), the window growing 4 of 6, the sidebar 7 of 12, the size change 3 of 6. Five scenarios stop on the control "the rest after the event does not fit main's own rest": after the sidebar hides, main's rulers rest with a bare stretch (cause B), so its own rest is not a model of it.
+
+**The synchronous path, `ruler-sync-check.mjs`** (MEASURED): Chromium, Firefox and WebKit each 0 of 14 inputs off the expected path (3 more are the guidelines panel's, skipped): leaving Preview after the window grew (D-01) and a scroll into content grown by a block nudged 20 in down (R1-F1; since record 36 an arrow moves ½ in, so 40 presses) took it exactly once each; the other 12 never; React refused 0 flushes. It cannot run on main (its counting edit is in `WorkspaceRulers.tsx`).
+
+**The copies, `ruler-check.mjs --exports`** (MEASURED; claims X1–X3 in `lib/rulerExports.mjs`): on this tree in Chromium, Firefox and WebKit, and on main with the switch on in Chromium, the print document of the top bar's Save PDF, the thumbnail (the app's own capture, decoded and hashed) and the PowerPoint file are the same with "Show ruler" on and off (X1: 0 parts differ), the print document holds no ruler mark (X2: 0 labels, 0 bars), and no ruler element is inside `#poster-canvas` (X3: 0). Controls held in every run: the rulers drawn as the editor opens (49 labels and 3 boxes in the rulers' colour on this tree, the same finder that reads 0 in the print document), "Show ruler" hides them, two copies made the same way are the same, and a typed word changes all three copies (Chromium's thumbnail hash `c1e8e514` → `db76fbc8`, the print body 30,368 → 30,374 characters). So "A visual aid only — it never prints or exports." holds for the rulers.
+
+**The shipped toggle** (MEASURED, the same runs): "Show ruler" is checked as the editor opens, and after it is unchecked and the page reloaded it is checked again with the rulers drawn: on by default, not remembered (it is `useState(true)` in `PosterEditor`, INSPECTED). A unit test enters through the Layout tab: checked as opened, unchecking it removes both rulers, checking it brings them back (TESTED: red with the switch off, the mutant `rulers-switched-off`).
+
+**The controls (fix 19) and the rulers** (MEASURED, INFORMATION, both trees, three engines): a title moved to the sheet's top-left corner and selected, at the fit and zoomed in 3 at the scroll's origin, at 1024, 1280 and 1920 px with the sidebar shown and hidden: 0 of its 9 to 12 grabbable controls under a ruler bar, on this tree and on main (12 readings each). The positive control, the block's corner scrolled 10 px inside the canvas under both bars: 1 to 5 controls covered, 559 to 1,954 px², and the same on both trees to 0.01 px² in each engine (the bars are where they were; the fix moves the marks, not the bars). The Show sidebar button, in the top bar since fix 12, overlaps the bars by 0 px² (both trees). `fit-check.mjs`'s Hh (a selected title's handle row against the 24 px top ruler after Fit, 12 fits; INFORMATION): 0 of 12 on both trees, the row's top 28.02 to 98.5 px below the canvas's top on each, the two trees within 0.02 px of each other (MEASURED, Chromium).
+
+**`fit-check.mjs`** (MEASURED, Chromium; 84 scenarios skipped for switches that are off, the phone share view for sharing): exit 0. Hr, the ruler guard, 0 of 53 fits: the filled axis's 0" at 0 px in 53 of 53, the other axis −0.33 to 0.50 px. Fix 03's claims hold (H1 0 of 53, H5 0 of 2, Hb, Hp, Hr2, Hr3, Ht, Ht6, Hts 0); its INFO claims are the Later list's (H4k-sidebar 2 of 2, Hf-sidebar 1 of 1), the same on main. On main with the switch on, the same run exits 1 on Hr alone: 53 of 53 fits, the filled axis at 24 px in all 53 and the other from −633 to 8.75 px.
+
+**Scrollbars that take space** (`POSTR_SCROLLBARS=classic`, 10 px ones in the layout; Chromium and WebKit, Playwright's Firefox draws none; MEASURED): at rest 0 of 97 scenarios in each (worst 0.51 px, the longest bare stretch 1.00 in; among them F-01's two inputs, `size-change-24x36-to-48x36` and `fit-after-pinch`, which left WebKit 5 px off before the workarea was observed); per frame 0 of 102 events stale in each (5,054 frames in Chromium, 4,449 in WebKit), 0 ResizeObserver loop errors.
+
+**The production build** (`npm run build` of this tree, served by `vite preview` with `POSTR_SERVE=preview`: no React StrictMode; Chromium; MEASURED): at rest 0 of 97 scenarios (worst 0.51 px, the longest bare stretch 1.00 in); per frame 0 of 102 events stale over 5,101 frames shown, 0 ResizeObserver loop errors. Firefox and WebKit were not run on the build.
+
+### 11.5 Tests, mutants, the suite
+
+- **`rulers.test.tsx`** (TESTED): 31 of 31 on this tree. Against main with the switch on (the file copied into the main copy and run there, then removed): 23 of 31 fail, among them every cause A, B and C test, with the predicted numbers (the top 0" at 88 against the sheet's 64: +24; the left at 88 against 73: +15, the bar's 24 px less 9 px of centring; after a scroll +24; in the device-pixel tests, a sheet at a fractional pixel, the top 0" 162.3 px from the sheet's edge). The 8 that pass on main: the shipped-toggle test (main draws rulers with the switch on), the spacing control, and six guards of the fix's own synchronous path and reach, which main's rulers, reading nothing, cannot fail.
+- **`rulersHidden.test.tsx`** (TESTED): 2 of 2, now with the switch mocked off (it was the lock on the hidden state). **`mvpHidden.test.tsx`**: its overlays test now asserts the one-aid line.
+- **Mutants** (TESTED, `mutation-check.mjs` on `docs/fixes/04-rulers-match-sheet.mutants.json`): control 31 of 31; 28 of 28 killed, among them the new `rulers-switched-off` (31 of 31 tests fail); 7 documented blind spots. `scripts/__tests__/mutantSpecs.test.mjs`: 30 of 30 (every committed spec still applies).
+- **Blind spots in the browser** (`blind-spot-check.mjs`, exit 0): 2 of 7 guarded in the browser, their controls passed: `reads-painted-sheet` (`ruler-check.mjs`, 5 of its 9 scenarios red, the 0" 7 to 27 px off: the reading taken while the entrance animation still scales the sheet) and `transform-placed` (`ruler-paint-check.mjs`, 3 of 3 WebKit layouts red, 5 to 8 ticks smeared each). 5 accepted unguarded with their reasons in the spec: `editor-scroll-state-removed`, `flush-in-commit` and `no-plus-one` (falsified in the browser on 2026-09-30 by the instruments their reasons name; not re-run), and `zoom-read-passive` and `onpage-passive`, which look equivalent: served per frame on the six matrix scenarios, 0 of 66 events stale each (Chromium, MEASURED).
+- **The web suite** (TESTED): 4,616 of 4,616 tests in 251 files. **`tsc --noEmit`**: clean. **`npm run build`**: exit 0.
+
+### 11.6 What the causes do not explain
+
+Causes A and B (section 6) explain every ruler error measured at rest on main `ac7d793` with the switch on, to 0.02 px (11.2). Main's stale frames (11.4) are cause B's bare stretches and, on the pinch, the wheel and the far jump, the mechanism of cause C in main's own code: its rulers follow the scroll through the editor's React state, which reaches the page a task after the frame is painted (INSPECTED; the parked record measured the same on `7f93b5b`, section 8). They do not explain, and this fix does not change: the compositor's own frames on a wheel scroll, which the per-frame judge cannot see (section 10); the out-of-bounds banner over the top ruler; the bars over scrollbars that take space; the ticks at the zoom floor; anything about the controls under the bars, which are where they were.
+
+### 11.7 The index docs
+
+`docs/feature-graph.md` (the `WorkspaceRulers.tsx` entry rewritten for placement by layout, the ratio listener and the new checks; the rulers' lines in `PosterEditor`, the Sidebar's "Show ruler" and its line, `stripEditorChrome`'s overlays, the switch's entries); `docs/manual-test-flows.md` (the header's switch note; PART 24, §44, the rulers by hand — numbered as next free on main `ac7d793`; other fixes in flight may take it first); `docs/stress-test/PLAN.md` (item 4's Status row; its Later entry; the rulers' Later entries brought over from the parked branch); `docs/fixes/README.md` (the ruler harnesses in the table; the parked note removed); `docs/launch/mvp-editor/bounded-designs.md` (§3.14 KEEP, the out-of-scope line, the work-in-flight row), `inventory.md` and `open-findings.md` (C-12) noted; `config/features.ts`'s comment on the switch.
+
+### 11.8 Bounded design (as shipped)
+
+Plain behaviour: two inch rulers along the canvas's top and left edges, under the top bar, a tick every inch and a label every 5 in, the 0" marks on the sheet's top-left corner, following the sheet through every zoom, scroll, resize, sidebar, Preview and size change in the frame it moves, and at a browser zoom (since the correction, section 11.9); "Show ruler" in the Layout tab, on as the editor opens, not remembered; never in a copy of the sheet, nor in the browser's own File › Print of the editor page (since the correction). Nothing a user can do with them: they take no pointer events and no keys.
+
+Out of scope (record 04's Later list, section 10; the lead's list): the dark workspace grid's offset from the sheet (and the grid itself is hidden since record 29); the out-of-bounds banner over the top ruler; the bars over scrollbars that take space; a tick every 2 px at the 20 % zoom floor; the pinch's cost per step; ruler units other than inches; guides dragged out of a ruler, a cursor position on the rulers, the rulers on a read-only share view (sharing is hidden); the rest of the editor page in the browser's own File › Print (main's, section 10).
+
+### 11.9 The review of the port, and its correction (2026-10-17)
+
+**The review.** One round on the frozen copy `rulers-frozen-1` (`9359a0b`), against main `ac7d793` with the switch on: one reviewer, with a probe of its own (`review-probe.mjs`) and this tree's late sampler, paint judge and controls reader, over what the port had not run: a browser zoom and Retina-like ratios (Chromium's own device scale factor 0.67 to 2.2), Firefox and WebKit on the production build, the browser's own print, a real window resized (Chromium's `Browser.setWindowBounds`), a ratio changed in mid-session, the tour, every preset and two custom sizes, and fix 19's controls at every preset. What it held (0 of its layout readings over the limits in three engines, 0 stale events of about 200, 0 smeared ticks of 6,798 in Chromium and 3,206 in WebKit, the app's three prints free of rulers, 0 of 1,324 grabbable controls under a bar) is MEASURED by the reviewer and UNVERIFIED here, except where re-measured below. Five findings, none above LOW. Each was taken as a hypothesis and reproduced first, with this tree's instruments wherever one could be made to see it (the reviewer's probes folded into them).
+
+| finding | reproduced on `9359a0b` (before) | after the correction |
+|---|---|---|
+| **R1-F1 LOW**: at a browser zoom the painted 0" and ticks sit about a device pixel off the sheet | MEASURED: `ruler-paint-check.mjs` with four configurations added, `chromium@0.9`, `@1.1`, `@1.8`, `@2.2` (Chromium's own ratio, a browser zoom of 90 % and 110 % on a display of ratio 1 and 2; 30 layouts each, 2 more skipped with the guidelines panel): 77 of 120 layouts over a limit (10, 9, 29 and 29 of 30); the painted 0" up to 1.005, 1.005, 0.989 and 1.011 device px from the painted sheet edge, a tick up to 1.305, 1.299, 1.109 and 1.300; 0 of 12,309 ticks smeared; every control held. TESTED red first: `rulers.test.tsx`, five ratios, 5 of 5 fail (at 0.9 the 0" marks at 225.6 and 135.6 device px, off the grid by the bars' own fraction) | MEASURED: the full `ruler-paint-check.mjs`, 385 layouts (24 skipped), 0 over any limit; at the four browser-zoom ratios 0 of 120, the painted 0" at most 0.005, 0.005, 0.011 and 0.011 device px from the painted sheet edge and a tick at most 0.509, 0.520, 0.518 and 0.543; 0 of 12,308 ticks smeared there, 0 of 39,401 in all; controls held. The unit tests green (after the two parts below) |
+| **R1-F2 INFO**: the paint judge's known answer cannot be read in Firefox | MEASURED (a scratch probe, `ff-paint-control.mjs`, the judge of `lib/rulerPaint.mjs` on the editor at the fit, 48 × 36 in, 1280 × 800): with each marks' layer moved half a device pixel by a translate, Firefox at emulated ratios 1, 1.25 and 2 reads 0 of 55 (top) and 0 of 52 (left) ticks smeared at each, the painted 0" one whole device pixel later instead (off0 1.005 to 1.011): Firefox paints the translated layer snapped. The same probe in WebKit reads 55 of 55 and 52 of 52 smeared at each ratio (its known answer, off0 0.505) | recorded: section 10, PLAN.md's Later list, manual-test-flows §44 (Firefox's painted ticks are the manual flow's) |
+| **R1-F3 INFO**: the browser's own File › Print of the editor page shows the rulers | MEASURED: `ruler-check.mjs` `file-print-media` (new, from the reviewer's `native-print-media`): under print media the two bars, the corner and 57 labels are shown, in Chromium, Firefox and WebKit; on screen the same finder reads the same (its control) | MEASURED: none of them shown under print media (0 bars, 0 labels) in all three engines and on the production build, the same finder reading the two bars, the corner and 57 labels on screen; the print document of the app's own Save PDF, the thumbnail and the PowerPoint file unchanged (`--exports`, X1 to X3 not observed in three engines; Chromium's print body 30,368 characters, as in 11.4) |
+| **R1-F4 INFO**: sentences the change left false | INSPECTED, each read in the files: `Sidebar.tsx:1133` said the rulers are hidden; `workspaceGeometry.ts` said the rulers no longer use the gutter "at all" (they re-read the layout when it changes); manual-test-flows §44 asked the tester to look at the workspace grid, which is not drawn (record 29; ruler-check's `grid` reading is null); the feature graph's `WorkspaceRulers.tsx` lines were 2 to 3 early and `features.ts:75` is :76. One sibling found by a grep for "ruler" in `src`: `printPoster`'s comment said the strip takes out "the grid and ruler overlays", and the rulers are never in the copy (§11.4, X3) | each corrected (the Sidebar comment, the gutter sentence, §44's grid item, the feature graph's lines regenerated, the print comment) |
+| **R1-F5 INFO**: the layout judges' limit of 0.516 px fits only a ratio of 1 | MEASURED: `ruler-check.mjs` with `fit-1280x800-48x36-dpr0.9`, `-dpr1.1`, `-dpr0.67` and `zoomed-in-4-scroll-middle-dpr0.67` added (Playwright's emulated ratio): at 0.67 the fit read 0.53, 0.52 and 0.53 px in Chromium, Firefox and WebKit and the zoomed one 0.53 px in Chromium, each over 0.516 px, where half a device pixel is 0.746 px: the rounding read as the defect | ruler-check's at-rest verdict and the per-frame judge now allow half a device pixel plus 1/64 px, `tickLimit(dpr)` = 0.5 / ratio + 1/64 (`lib/frameRecorder.mjs`): 0.516 px at 1, 0.762 at 0.67, 0.266 at 2, so tighter above a ratio of 1. With it, `9359a0b` reads none of the four over (MEASURED, three engines). `fit-check.mjs`'s Hr keeps the gate's 0.5 px + 1/64 (its ratios are 1 to 1.5, where that is the looser) |
+
+**The cause of R1-F1, and a second one the first correction left.** `place()` rounded each marks' layer to whole device pixels within its bar (`left = round(x × ratio) / ratio`, `x` the sheet's place in the bar). The browser snaps a box's place on the screen when it paints, so a layer rounded in its bar is rounded again wherever the bar itself sits at a fraction of a device pixel: at 0.9, with the sidebar hidden, the top bar starts at 24 px, 21.6 device px, and the left bar, under the 44 px top bar, at 68 px, 61.2 device px. At the ratios the port had run (1, 1.25, 1.5 and 2) no position was over (11.3), consistent with the bars sitting on whole device pixels there (INSPECTED). The cause is the reviewer's hypothesis, confirmed by its patch (MEASURED by the reviewer), by the red test and by the numbers after (MEASURED here). The correction rounds the layer's place on the screen, `left = round((bar + x) × ratio) / ratio − bar`, the reading carrying where each bar starts on the screen (`barX`, `barY`). The first run of the paint check after it (MEASURED, `9359a0b` plus that change): 3 of 385 layouts still over, all `chromium@2.2`, the left ruler's 0" 0.989 device px before the painted sheet edge (`fit-1024x768-48x36`, `zoom-in-2-scroll-odd`, `preview-roundtrip`). A probe of those layouts (scratch, MEASURED): in each the sheet is laid out at exactly half a device pixel (its holder's top at 553.5 and 258.5 device px; four passing ones at 377.297, 453.969, 334.969 and 478.703), and painted on the pixel after it (554, 259: a half rounds up); but Chromium reports boxes at single precision, so the reading came back as 553.4999845 and 258.4999888, and the rounding went down (the layer at 553 and 258). The correction's second part: a reading within 1/128 of a device pixel below a half rounds up (`TIE`, `WorkspaceRulers.tsx`; above single precision's error on any coordinate up to 100,000 device px, below every engine's layout grid). TESTED red first: four cases of a sheet scrolled to exactly half a device pixel with the boxes reported at single precision (`stubLayout`'s `float32`), 4 of 4 fail (at 2.2 the edge at 68 + 0.5 device px read as 68.49999805, the 0" at 68 against the painted 69). After it, `chromium@2.2` read 0 of 30 (the painted 0" at most 0.011 device px off, a tick at most 0.543; MEASURED), and the full run is below.
+
+**The control's own rounding.** `ruler-paint-check.mjs`'s controls set the layers to known places, and that known place was rounded in the bar too (`setKnown`); it now rounds on the screen as the rulers do. Its controls compare looks with each other (a layer one device pixel further reads one pixel later), so the old rounding did not falsify them, and they held in every configuration before and after (MEASURED).
+
+**One root cause for three of the five.** R1-F1 (the product), the paint control, and R1-F5 (the judges' limit) each assumed that a device pixel lines up with the bar's CSS pixels: true at a ratio of 1 with the bars at whole pixels, which is every configuration the port had run, and false at a browser zoom. The tie (the first correction's residue) is the same rounding meeting the browser's own rule for a half through single precision. What this does **not** explain: R1-F2 (Firefox snapping a translated layer, an engine's behaviour, not this code's), R1-F3 (the editor page had no print rule), R1-F4 (sentences left behind by the port).
+
+**R1-F3's change.** The three ruler boxes carry `data-postr-ruler`, and `index.css` hides them under print media. jsdom applies no print media, so the mutant that removes the rule (`rulers-printed`) is a documented blind spot of the unit tests, guarded in the browser by `file-print-media` (below). The rest of the editor page still prints with File › Print; that is main's (section 10).
+
+**Results after the correction** (this tree, `9359a0b` plus the correction; MEASURED unless marked):
+
+- **At rest, `ruler-check.mjs`** (154 scenarios, 51 the guidelines panel's skipped while `EDITOR_EXTRAS_ENABLED` is off, the share view skipped while sharing is hidden): Chromium, Firefox and WebKit each 0 of 102 over the limit; both 0" marks within 0.50 px of the sheet's corner in 181 of 181 readings in each; the worst mark 0.51, 0.50 and 0.51 px; the longest bare stretch 1.00, 0.99 and 1.00 in; the text editor's focus hint 0.59, 0.63 and 0.65 px from its block after a 60 px scroll. At the browser-zoom ratios (Playwright's), the worst mark 0.26 px at 0.67 (the fit), 0.48 px at 0.67 zoomed in and scrolled, 0.40 at 0.9 and 0.32 at 1.1, the same in the three engines to 0.03 px; `file-print-media`: 0 bars and 0 labels under print media in each. Scrollbars that take space (`POSTR_SCROLLBARS=classic`): Chromium and WebKit 0 of 102 (worst 0.51 px at a ratio of 1; WebKit's 0.70 px is at 0.67, zoomed in and scrolled, under its limit of 0.762), the 0" marks 0 over 0.5 px of 177 and 179. The production build (`npm run build`, `POSTR_SERVE=preview`, Chromium): 0 of 102, worst 0.51 px, the 0" marks 0 over 0.5 px of 181, print media 0 bars and 0 labels.
+- **Per frame, `ruler-check.mjs --frames`** (19 scenarios, 17 run, 102 events, the gate's matrix at 1024, 1280 and 1920 px with the sidebar shown and hidden among them): 0 of 102 events stale in Chromium (5,020 frames shown), Firefox (4,949) and WebKit (4,423); with classic scrollbars 0 of 102 in Chromium (5,051) and WebKit (4,453); the production build in Chromium 0 of 102 (5,121); 0 ResizeObserver loop errors in any.
+- **Paint, `ruler-paint-check.mjs`** (409 scenarios: 385 judged, 24 the guidelines panel's skipped): 0 of 385 over any limit and 0 of 39,401 ticks smeared, controls held in every configuration (exit 0). By configuration (the painted 0" / the worst tick, device px): Chromium at 1, 1.25, 1.5, 2: 0.005 / 0.505, 0.005 / 0.518, 0.011 / 0.518, 0.011 / 0.511; at 0.9, 1.1, 1.8, 2.2: 0.005 / 0.509, 0.005 / 0.520, 0.011 / 0.518, 0.011 / 0.543; WebKit at 1 and 2: 0.001 / 0.499 and 0.001 / 0.522 (at 1.25 and 1.5 printed, not counted, 0.812 and 0.498 for the 0", as in 11.3); the five ratio changes 0 of 25 (to 1: 0.005 / 0.505; to an emulated 2, printed, not counted, 2.011, as in 11.3).
+- **The copies, `ruler-check.mjs --exports`**: X1 to X3 not observed in Chromium, Firefox and WebKit; "Show ruler" checked as the editor opens and checked again after it is turned off and the page reloaded (on by default, not remembered), 49 labels and 3 boxes drawn as opened; the layout tab's line "A visual aid only — it never prints or exports." (now true of File › Print too).
+- **The synchronous path, `ruler-sync-check.mjs`**: Chromium, Firefox and WebKit each 0 of 14 inputs off the expected path (3 more skipped with the guidelines panel); D-01 and the nudged-content jump took it once each, React refused 0 flushes.
+- **`fit-check.mjs`** (Chromium): exit 0; Hr 0 of 53 fits, the filled axis's 0" at 0 px in 53 of 53, the other axis −0.33 to 0.50 px; fix 03's claims hold (H1 0 of 53, H5 0 of 2, Hh 0 of 12 and the rest), its INFO claims the Later list's (H4k-sidebar 2 of 2, Hf-sidebar 1 of 1), as in 11.4.
+- **Blind spots in the browser, `blind-spot-check.mjs`**: exit 0, controls 3 of 3 passed; 3 of 8 guarded: `rulers-printed` (new; `file-print-media` red with the rule removed, the bars, the corner and 57 labels shown), `reads-painted-sheet` (5 of its 9 scenarios red, the 0" 8 to 27 px off) and `transform-placed` (3 of 3 WebKit layouts red, 5 to 8 ticks smeared each); 5 accepted unguarded with their reasons, as in 11.5.
+- **Not run, by the correction** (section 10): Firefox's and WebKit's paint at the browser-zoom ratios; a real Ctrl/Cmd +/−; Firefox and WebKit on the production build (the reviewer ran them, UNVERIFIED here); the main tree again (its numbers are in 11.2: main's rulers are off by up to 875 px, and the browser-zoom configurations only add ratios to the fix's own claims).
+
+**Tests, mutants, the suite** (TESTED): `rulers.test.tsx` 40 of 40 (9 new: the five browser-zoom ratios, red 5 of 5 before the correction; the four half-pixel ties, red 4 of 4 before its second part); the spec: control 40 of 40, 30 of 30 mutants killed, among them the new `snap-against-bar` (the layer rounded in its bar, 9 of 40 tests fail) and `tie-rounded-down` (4 of 40), and 8 documented blind spots, the new `rulers-printed` among them; `scripts/__tests__/mutantSpecs.test.mjs` passes (it caught one stale edit text in the spec, `snap-floor`'s, after the tie changed the line); the web suite 4,625 of 4,625 in 251 files; `tsc --noEmit` clean; `npm run build` exit 0 (the bundle holds the screen rounding and the print rule, INSPECTED).
+
+**Changed by the correction:** `WorkspaceRulers.tsx` (the reading's `barX`/`barY`, `place()`'s screen rounding and `TIE`, `data-postr-ruler`), `index.css` (the print rule), the comments of `Sidebar.tsx`, `workspaceGeometry.ts` and `printPoster`; `rulers.test.tsx`; `ruler-paint-check.mjs` (the four ratios, the control's rounding), `ruler-check.mjs` (the ratio in each reading, four ratio scenarios, `file-print-media`, the limit), `lib/frameRecorder.mjs` (`tickLimit`, the ratio in each frame's reading); the spec; this record, the feature graph, manual-test-flows §44, PLAN.md, the README's harness table and bounded-designs §3.14.
+
+## 12. Merge with main (records 35, 36, 37 and 39), 2026-10-17
+
+Main had moved to c4a9fb7. Git merged the source on its own (`PosterEditor.tsx` included); two
+docs conflicted and both sides were kept (the harness index rows; the manual flows, where this
+record's checklist is now PART 24, §44, after records 36, 37, 39 and 35, and its references follow).
+
+On the merged tree (lead, MEASURED): suite 4808 of 4808 (256 files), tsc 0, `npm run build` 0.
+Chromium: `ruler-check.mjs` at rest exit 0 (0 of 102 observed, worst mark 0.51 px, drift at most
+0.03 px; 51 skipped by the guidelines panel's switch), in Firefox exit 0 (0 of 102, worst 0.50 px);
+`--frames` exit 0 (0 of 102 events stale over 5 016 frames, the 1024 / 1280 / 1920 px matrix
+included); `--exports` exit 0 (X1–X3 not observed: no ruler in the print document, the thumbnail or
+the PowerPoint file; "Show ruler" on as the editor opens); `ruler-paint-check.mjs` exit 0 (0 of 385
+layouts over a limit, the worst 0" 0.011 device px); `ruler-sync-check.mjs` 0 inputs off the
+expected path; `fit-check.mjs` exit 0 (Hr 0 of 53, the filled axis 0 px, the other axis −0.33 to
+0.50 px; H4k-sidebar and Hf-sidebar are record 03's information claims); record 34/35's
+`canvas-paste-check.mjs` exit 0 (116 clean); record 12/36's `undo-history-check.mjs` exit 0 (63
+clean); record 30's `print-path-check.mjs` exit 0 (controls held). `mutation-check.mjs` 30 of 30
+killed (8 documented blind spots).

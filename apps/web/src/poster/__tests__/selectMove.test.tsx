@@ -52,6 +52,7 @@ vi.mock('@/motion/timelines/editorEntrance', () => ({ editorEntrance: vi.fn() })
 vi.mock('@/motion/timelines/blockSelection', () => ({ blockSelection: vi.fn() }));
 
 import { ACK_BLOCK_ID } from '@/export/ackBlock';
+import { usePosterStore } from '@/stores/posterStore';
 import { MAC, selectionKeyAction } from '../selectionKeys';
 import { findButton } from './editorKit';
 import {
@@ -384,6 +385,34 @@ describe('K4 — a group move or resize is one undo step (OF-06)', () => {
     expect(pair()).toBe(moved);
   });
 
+  // The merge of records 35 and 36 (the lead's check): a change made silently
+  // while the group is dragged — record 35's pasted copy getting its own file
+  // when storage's copy lands — must survive the drag's ⌘Z, as it does for a
+  // single block's drag (record 35, R3-3's sibling, `atPreDragGeometry`).
+  it('a group drag’s ⌘Z puts the places back and keeps a change made silently during the drag', async () => {
+    await selectTwo();
+    const before = places();
+    const grip = groupFrame();
+    pointer(grip, 'pointerdown', 100, 100);
+    await nextTask();
+    for (let i = 1; i <= 6; i += 1) {
+      pointer(window, 'pointermove', 100 + 15 * i, 100 + 10 * i);
+      await nextTask();
+    }
+    const state = usePosterStore.getState();
+    state.setBlocksSilent(state.doc!.blocks.map((b) => (b.id === 'b2' ? { ...b, imageSrc: 'storage://u/p/b2-settled.png' } : b)));
+    for (let i = 7; i <= 12; i += 1) {
+      pointer(window, 'pointermove', 100 + 15 * i, 100 + 10 * i);
+      await nextTask();
+    }
+    pointer(window, 'pointerup', 100 + 15 * 12, 100 + 10 * 12);
+    await nextTask();
+    expect(places(), 'precondition: the drag moved the group').not.toBe(before);
+    await press(document.body, KEYS.undo);
+    expect(places(), 'the places are back').toBe(before);
+    expect(at('b2')!.imageSrc, 'the file that landed during the drag is kept').toBe('storage://u/p/b2-settled.png');
+  });
+
   // Review round 1, R36-1: a drag that ends where it started changed nothing
   // and still added a step, so the next ⌘Z showed nothing. The store's
   // setBlocks now drops a write that changes nothing, as updateBlock,
@@ -425,5 +454,32 @@ describe('K4 — a group move or resize is one undo step (OF-06)', () => {
     expect(places()).toBe(before);
     await press(document.body, KEYS.redo);
     expect(pair()).toBe(resized);
+  });
+
+  // The merge of records 35 and 36, the resize half: each step of the group
+  // resize used to rebuild the poster from the drag's start, so a change that
+  // landed during it was lost even before the release.
+  it('a group resize keeps a change made silently during it, through the resize and its ⌘Z', async () => {
+    await selectTwo();
+    const before = places();
+    const handle = groupFrame().querySelector('[data-postr-resize-handle="se"]') ?? groupFrame().querySelector('[data-postr-resize-handle]');
+    pointer(handle!, 'pointerdown', 100, 100);
+    await nextTask();
+    for (let i = 1; i <= 6; i += 1) {
+      pointer(window, 'pointermove', 100 + 15 * i, 100 + 10 * i);
+      await nextTask();
+    }
+    const state = usePosterStore.getState();
+    state.setBlocksSilent(state.doc!.blocks.map((b) => (b.id === 'b2' ? { ...b, imageSrc: 'storage://u/p/b2-landed.png' } : b)));
+    for (let i = 7; i <= 12; i += 1) {
+      pointer(window, 'pointermove', 100 + 15 * i, 100 + 10 * i);
+      await nextTask();
+    }
+    expect(at('b2')!.imageSrc, 'kept through the rest of the resize').toBe('storage://u/p/b2-landed.png');
+    pointer(window, 'pointerup', 100 + 15 * 12, 100 + 10 * 12);
+    await nextTask();
+    await press(document.body, KEYS.undo);
+    expect(places(), 'the places and sizes are back').toBe(before);
+    expect(at('b2')!.imageSrc, 'and the change is kept').toBe('storage://u/p/b2-landed.png');
   });
 });

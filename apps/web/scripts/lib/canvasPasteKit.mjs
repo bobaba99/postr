@@ -293,8 +293,16 @@ export const othersChanged = (before, after, except = []) => before
 /** Whether a block lies wholly on the sheet. */
 export const onSheet = (b, sheet) => b.x >= 0 && b.y >= 0 && b.x + b.w <= sheet.w + 1e-6 && b.y + b.h <= sheet.h + 1e-6;
 
-/** Uploads of poster-assets since `since` whose file is block `blockId`'s (path …/{blockId}.{ext}). */
-export const uploadsOf = (state, blockId, since = 0) => state.uploads.filter((u) => u.t >= since && u.status === 200 && new RegExp(`/${blockId}\\.[a-z0-9]+$`).test(u.path));
+/**
+ * The name of block `blockId`'s file, as a pattern: {blockId}.{ext} (record
+ * 34's uploads) or, since record 35's new name per upload,
+ * {blockId}-{random}.{ext}. Record 34's claims are about the keying; record
+ * 35's own scenarios require the new name.
+ */
+export const keyedName = (blockId, ext = '[a-z0-9]+') => `${blockId}(?:-[A-Za-z0-9_-]+)?\\.${ext}`;
+
+/** Uploads of poster-assets since `since` whose file is block `blockId`'s (path …/{blockId}[-{random}].{ext}). */
+export const uploadsOf = (state, blockId, since = 0) => state.uploads.filter((u) => u.t >= since && u.status === 200 && new RegExp(`/${keyedName(blockId)}$`).test(u.path));
 
 /** Wait until `read()` is truthy; its value, or null. */
 export async function until(read, timeout = 10000, every = 100) {

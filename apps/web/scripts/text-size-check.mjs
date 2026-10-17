@@ -6,7 +6,8 @@
  *
  * Every scenario enters where a user does: the editor opened on a stored
  * poster (lib/editorHarness.mjs, the backend faked at the network, a term
- * holder), the top bar's "Decrease text size" / "Increase text size"
+ * holder; the new-row scenarios at /p/new as a guest, lib/guestBackend.mjs),
+ * the top bar's "Decrease text size" / "Increase text size"
  * pressed with the mouse (Playwright's pointer) or reached with Tab and
  * pressed with Enter and Space, the top bar's Undo and Redo, the sidebar's
  * tabs and the Style tab's size fields typed into, the top bar's Save PDF,
@@ -72,6 +73,24 @@
  *        negative number (the control absent counts)
  *   ODDLEVEL  a title stored as null is changed by A+ or A− (R1-F5), or
  *        the heading does not follow the rule
+ *   Reopening a poster (record 37, docs/fixes/37-load-size-cap.md;
+ *   lib/textSizeReloadScenarios.mjs): the size drawn before a reload is
+ *   the size drawn after it, unless the poster holds the old default
+ *   (title 60, heading 28, authors 22, body 18 units) as a whole:
+ *   RELOAD  a title of 170 and a heading of 80 pt set by hand, A+ to 48 pt
+ *        (226.67 and 106.67 pt, past the old load-time ceilings), saved,
+ *        reloaded: a level drawn otherwise after the reload
+ *   RELOADSTYLE  then the Style tab's heading typed to 110 pt, saved,
+ *        reloaded: the heading not drawn at 110 pt
+ *   RELOAD12  the Style tab's Body field typed to 12 pt (its minimum), A+
+ *        once (record 33 R1-F2), saved, reloaded: a level drawn otherwise
+ *   RELOADONE  the Style tab's title typed to 432 pt (the old default's
+ *        title alone, exactly 60 units), saved, reloaded: the title not at
+ *        432 pt or another level moved (one old value is not an old poster)
+ *   STALE  a poster stored with the old default's four sizes and a user's
+ *        blocks is not drawn at today's defaults (100.8 / 57.6 / 36 / 36 pt)
+ *   STALEEMPTY  the old default as a new row held it (no blocks): not
+ *        drawn at today's defaults, or no template laid out
  *
  * INFORMATION (printed, not counted)
  *   ROUTE  the Style tab's way to raise every level one step: the fields a
@@ -80,12 +99,29 @@
  *   extremes  on the templates and the welcome poster, at the start, at 48
  *        pt and at 28 pt: overlapping blocks, blocks past the sheet, and the
  *        Issues rows about them (the brief's rule 7)
- *   RELOAD  a poster with a title of 170 and a heading of 80 pt set by hand,
- *        A+ to 48 pt, saved and reloaded: each level before and after (a
- *        sibling: the editor page replaces a level above its ceiling when it
- *        opens a poster, record 33 §6)
- *   RELOAD12  the Style tab's Body field typed to 12 pt (its minimum), A+
- *        once, saved, reloaded: the levels the reload resets (R1-F2)
+ *   old-default-one-edited  the old default with the body changed by hand
+ *        (60 / 28 / 22 / 9 units): drawn as stored (record 37's rule: all four
+ *        sizes or none)
+ *   reload-siblings  the Layout tab's width 100 and height 10 in (the
+ *        fields' bounds), the palette "Nature / Biology" and the font DM
+ *        Sans, saved, reloaded: what the reload changes (record 37 §6)
+ *   font-not-listed  a stored font the font list does not have, opened and
+ *        reloaded: what the store holds and the canvas asks for
+ *   reload-emptied-…  every deletable block deleted (a poster written into,
+ *        a new one), saved, reloaded: whether the starting template comes
+ *        back, the palette kept, the locked blocks (the credit mark) at the
+ *        start
+ *   Review round 1 of record 37 (lib/textSizeNewRowScenarios.mjs):
+ *   new-row-defaults  a guest's first /p/new: the row the fake backend
+ *        inserted (the posters table's column default) against the
+ *        migration file's default and today's DEFAULT_STYLES, what is drawn,
+ *        the Style tab's fields; then A+ and A− once, and Body 12 and A+
+ *        (R37-1, R37-3)
+ *   new-row-emptied  that new poster with every deletable block deleted,
+ *        saved: the row against the inserted one, key by key (R37-2)
+ *   old-default-strings / old-default-authors-absent  the old default with
+ *        its sizes as strings, and with no authors level: drawn, the store
+ *        with each size's type, the fields (R37-5)
  *   RTRELOAD / RTSTYLE  the two round trips the anchor does not keep exact
  *        (R1-F3, record 33 §10): A+ ×2, a reload, A− ×2; and A+ ×2, a
  *        Style-tab title, A−, Undo ×2, A− ×2: the store's misses
@@ -103,6 +139,12 @@
  *     app's store module in the page), not from what is drawn.
  *   - The native tooltip of a title is not seen; the attribute is read.
  *   - The backend is a fake; a reload is not part of a round trip.
+ *   - A reload reopens the poster from the fake backend's row as the
+ *     autosave left it; the production database and its column defaults
+ *     are not read (record 37 §3). new-row-… read what the fake inserts (its
+ *     DEFAULT_DATA), and whether that is the migration file's default
+ *     (`fakeCopiesMigration`): a database built from another version of
+ *     the migration holds another default.
  *
  * RUN (from apps/web; apps/web/.env points at the fake backend)
  *   node scripts/text-size-check.mjs [--only id,id] [--json file]
@@ -124,6 +166,8 @@ import { ladder } from './lib/textSizeLadder.mjs';
 import { NoControl } from './lib/textSizeKit.mjs';
 import * as S from './lib/textSizeScenarios.mjs';
 import * as E from './lib/textSizeEdgeScenarios.mjs';
+import * as RL from './lib/textSizeReloadScenarios.mjs';
+import * as NR from './lib/textSizeNewRowScenarios.mjs';
 
 const PORT = Number(process.env.PORT ?? 5860);
 const argVal = (name) => {
@@ -154,8 +198,18 @@ const SCENARIOS = [
   }))),
   { id: 'unbound', poster: 'user-filled', how: '⌘⇧> and ⌘⇧< with the caret in text', run: S.unbound },
   { id: 'arrange', poster: 'user-filled', how: 'A+ ×3, then Layout › Auto-Arrange', run: S.arrange },
-  { id: 'reload-ceiling', poster: 'hand-large-36', info: true, how: 'title 170 and heading 80 pt by hand, A+ ×3, saved, reloaded', run: S.reloadCeiling },
-  { id: 'reload-small-body', poster: 'user-filled', info: true, how: 'Style › Typography › Body 12 pt, A+, saved, reloaded', run: E.reloadSmallBody },
+  { id: 'reload-ceiling', poster: 'hand-large-36', how: 'title 170 and heading 80 pt by hand, A+ ×3, saved, reloaded; Style heading 110 pt, saved, reloaded', run: RL.reloadCeiling },
+  { id: 'reload-small-body', poster: 'user-filled', how: 'Style › Typography › Body 12 pt, A+, saved, reloaded', run: RL.reloadSmallBody },
+  { id: 'reload-old-title-alone', poster: 'user-filled', how: 'Style › Typography › title 432 pt (the old default’s title alone), saved, reloaded', run: RL.reloadOldTitleAlone },
+  { id: 'old-default-written', poster: 'old-default-written', how: 'a poster stored with the old default’s four sizes and a user’s blocks, opened', run: RL.oldDefault('STALE') },
+  { id: 'old-default-empty', poster: 'old-default-empty', how: 'the old default as a new row held it (no blocks), opened', run: RL.oldDefault('STALEEMPTY') },
+  { id: 'old-default-one-edited', poster: 'old-default-one-edited', info: true, how: 'the old default with the body changed by hand (60 / 28 / 22 / 9 units), opened', run: RL.oldDefaultOneEdited },
+  { id: 'reload-siblings', poster: 'user-filled', info: true, how: 'Layout width 100 and height 10 in, palette Nature / Biology, font DM Sans, saved, reloaded', run: RL.reloadSiblings },
+  { id: 'font-not-listed', poster: 'font-not-listed', info: true, how: 'a stored font the list does not have, opened and reloaded', run: RL.fontNotListed },
+  ...['user-filled', 'tpl-3col'].map((poster) => ({ id: `reload-emptied-${poster}`, poster, info: true, how: 'every deletable block deleted, saved, reloaded', run: RL.reloadEmptied })),
+  { id: 'new-row-defaults', entry: 'guest', info: true, how: 'a guest’s first /p/new: the row inserted, what is drawn; A+, A−; Style › Body 12, A+', run: NR.newRowDefaults },
+  { id: 'new-row-emptied', entry: 'guest', info: true, how: 'a guest’s first /p/new, every deletable block deleted, saved: the row against the inserted one', run: NR.newRowEmptied },
+  ...['old-default-strings', 'old-default-authors-absent'].map((poster) => ({ id: poster, poster, info: true, how: `the old default ${poster.endsWith('strings') ? 'with its sizes stored as strings' : 'with no authors level'}, opened`, run: NR.oldDefaultOdd })),
   { id: 'round-trip-reload', poster: 'user-filled', info: true, how: 'A+ ×2, saved, reloaded, A− ×2', run: E.reloadRoundTrip },
   { id: 'round-trip-style-undo', poster: 'user-filled', info: true, how: 'A+ ×2, Style title 130 pt, A−, Undo ×2, A− ×2', run: E.styleUndoRoundTrip },
 ];
@@ -181,11 +235,15 @@ try {
     const t0 = Date.now();
     let ed;
     try {
-      const p = posterById(sc.poster);
-      ed = await openEditor(h, {
-        viewport: sc.viewport ?? WIDE, poster: p.size, editDoc: (d) => p.build(assets, d),
-        prepare: (context) => context.addInitScript(() => { window.print = () => {}; }),
-      });
+      if (sc.entry === 'guest') {
+        ed = await NR.openNewGuestPoster(h, { viewport: sc.viewport ?? WIDE });
+      } else {
+        const p = posterById(sc.poster);
+        ed = await openEditor(h, {
+          viewport: sc.viewport ?? WIDE, poster: p.size, editDoc: (d) => p.build(assets, d),
+          prepare: (context) => context.addInitScript(() => { window.print = () => {}; }),
+        });
+      }
       const r = await sc.run(ed.page, ed);
       results.push({ id: sc.id, how: sc.how, ms: Date.now() - t0, pageErrors: ed.state.errors, ...r, ...(sc.info ? { info: true } : {}) });
     } catch (e) {

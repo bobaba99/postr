@@ -1,0 +1,997 @@
+{
+  "tests": [
+    "src/poster/__tests__/blockClipboardEntry.test.tsx",
+    "src/poster/__tests__/blockClipboardRules.test.ts",
+    "src/poster/__tests__/canvasPasteEntry.test.tsx",
+    "src/poster/__tests__/canvasPasteRules.test.ts",
+    "src/poster/__tests__/uploadOwner.test.tsx",
+    "src/data/__tests__/posterImages.test.ts"
+  ],
+  "mutants": {
+    "no-order-1": {
+      "undoes": "B1 — a marked payload is table B's order 1 (Postr's copied blocks are pasted as blocks)",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  if (clip) return { kind: 'blocks', payload: clip.payload };",
+          "  void clip;"
+        ]
+      ]
+    },
+    "invalid-falls-through": {
+      "undoes": "C6 — a marked payload that fails validation pastes nothing (no fall-through to the text row)",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  if (clip) return { kind: 'blocks', payload: clip.payload };",
+          "  if (clip?.payload) return { kind: 'blocks', payload: clip.payload };"
+        ]
+      ]
+    },
+    "no-version-check": {
+      "undoes": "C6 — the payload's version is 1",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "    v: (v) => v === CLIP_VERSION,",
+          "    v: () => true,"
+        ]
+      ]
+    },
+    "extra-keys-allowed": {
+      "undoes": "C6 — only known fields (an unknown field or `locked` fails)",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "  if (!Object.keys(v).every((k) => own(checks, k) && checks[k]!(v[k]))) return false;",
+          "  if (!Object.keys(v).every((k) => !own(checks, k) || checks[k]!(v[k]))) return false;"
+        ]
+      ]
+    },
+    "no-coordinate-range": {
+      "undoes": "C6 — x and y within ±10 000 units",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "  x: num(-CLIP_LIMITS.coord, CLIP_LIMITS.coord),\n  y: num(-CLIP_LIMITS.coord, CLIP_LIMITS.coord),",
+          "  x: num(-Infinity, Infinity),\n  y: num(-Infinity, Infinity),"
+        ]
+      ]
+    },
+    "size-zero-allowed": {
+      "undoes": "C6 — a width and height above 0",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "Number.isFinite(v) && v > 0 && v <= hi;",
+          "Number.isFinite(v) && v >= -hi && v <= hi;"
+        ]
+      ]
+    },
+    "string-numbers": {
+      "undoes": "C6 — a number is a number (not a string)",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "const num = (lo: number, hi: number): Check => (v) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;",
+          "const num = (lo: number, hi: number): Check => (v) => Number.isFinite(Number(v)) && Number(v) >= lo && Number(v) <= hi;"
+        ]
+      ]
+    },
+    "no-block-cap": {
+      "undoes": "C6 — at most 200 blocks",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "b.length <= CLIP_LIMITS.blocks",
+          "b.length <= Infinity"
+        ]
+      ]
+    },
+    "no-json-cap": {
+      "undoes": "C6 — the JSON at most 2 000 000 characters",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "  if (raw.length > CLIP_LIMITS.json) return { payload: null };\n",
+          ""
+        ]
+      ]
+    },
+    "chart-is-a-kind": {
+      "undoes": "C1 / C6 — charts are not copied or pasted (hidden, D1)",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "'image', 'logo', 'table', 'references']);",
+          "'image', 'logo', 'table', 'references', 'chart']);"
+        ]
+      ]
+    },
+    "table-cells-mismatch": {
+      "undoes": "C6 — a table has one cell per place",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "t.cells.length === t.rows * t.cols && ",
+          ""
+        ]
+      ]
+    },
+    "preset-in-prototype": {
+      "undoes": "C6 — a known border preset, by own key (not `constructor`)",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "own(TABLE_BORDER_PRESETS, p)",
+          "p in TABLE_BORDER_PRESETS"
+        ]
+      ]
+    },
+    "text-not-clean": {
+      "undoes": "C6 — a pasted text is cleaned by the editor's sanitizer",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "    content: sanitizeHtml(c.content),",
+          "    content: c.content,"
+        ]
+      ]
+    },
+    "caption-not-clean": {
+      "undoes": "C6 — a pasted caption is cleaned",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "block.caption = sanitizeHtml(c.caption);",
+          "block.caption = c.caption;"
+        ]
+      ]
+    },
+    "note-not-clean": {
+      "undoes": "C6 — a pasted note is cleaned",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "block.note = sanitizeHtml(c.note);",
+          "block.note = c.note;"
+        ]
+      ]
+    },
+    "cells-not-clean": {
+      "undoes": "C6 — pasted table cells are cleaned",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "cells: c.tableData.cells.map((cell) => sanitizeHtml(cell))",
+          "cells: c.tableData.cells.map((cell) => cell)"
+        ]
+      ]
+    },
+    "prompt-not-plain": {
+      "undoes": "C6 — a pasted prompt is plain text",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "block.prompt = plainText(c.prompt);",
+          "block.prompt = c.prompt;"
+        ]
+      ]
+    },
+    "any-source-kept": {
+      "undoes": "D / C6 — only a poster-assets file is a source to copy",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "const src = picture && isPosterAssetSrc(c.imageSrc) ? c.imageSrc : null;",
+          "const src = picture && c.imageSrc ? c.imageSrc : null;"
+        ]
+      ]
+    },
+    "lost-uncounted": {
+      "undoes": "D — an image with another source is counted in the toast",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "return { block, src, lost: picture && c.imageSrc !== null && src === null };",
+          "return { block, src, lost: false };"
+        ]
+      ]
+    },
+    "credit-mark-is-a-logo": {
+      "undoes": "C4 — the locked credit mark is not a user logo",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "    logo: poster.some((b) => b.type === 'logo' && !b.locked),",
+          "    logo: poster.some((b) => b.type === 'logo'),"
+        ]
+      ]
+    },
+    "second-one-pasted": {
+      "undoes": "C4 — a paste brings at most one title, authors block or logo",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "    has[kind] = true;\n    return true;",
+          "    return true;"
+        ]
+      ]
+    },
+    "no-offset": {
+      "undoes": "C3 — 1 in down and right while an original is on the poster",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "  return payload.some((c) => poster.some((b) => b.id === c.id)) ? 10 : 0;",
+          "  return 0;"
+        ]
+      ]
+    },
+    "always-offset": {
+      "undoes": "C3 — at the originals' places in another poster and after a cut",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "  return payload.some((c) => poster.some((b) => b.id === c.id)) ? 10 : 0;",
+          "  return 10;"
+        ]
+      ]
+    },
+    "not-kept-on-sheet": {
+      "undoes": "C3 — each copy kept on the sheet",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "  const keep = (v: number, len: number, room: number) => Math.max(0, Math.min(room - len, v));\n  return { x: keep(b.x + offset",
+          "  const keep = (v: number, _len: number, _room: number) => v;\n  return { x: keep(b.x + offset"
+        ]
+      ]
+    },
+    "credit-mark-copied": {
+      "undoes": "C1 / C2 — the credit mark is never copied",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "const picked = blocks.filter((b) => selected.has(b.id) && !b.locked);",
+          "const picked = blocks.filter((b) => selected.has(b.id));"
+        ]
+      ]
+    },
+    "selection-order": {
+      "undoes": "C1 — the payload in the poster's order (paint order), not the order of selection",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "const picked = blocks.filter((b) => selected.has(b.id) && !b.locked);",
+          "const picked = [...selected].map((id) => blocks.find((b) => b.id === id)!).filter((b) => b && !b.locked);"
+        ]
+      ]
+    },
+    "other-source-travels": {
+      "undoes": "D — a source that is not a poster-assets file is written as '' (the paste counts it)",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "(isPosterAssetSrc(b.imageSrc) ? b.imageSrc : '')",
+          "b.imageSrc"
+        ]
+      ]
+    },
+    "no-words": {
+      "undoes": "C1 / C5 — another application gets the blocks' words as plain text",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "return { html, text: words.map((w) => w.join('\\n')).join('\\n\\n') };",
+          "return { html, text: '' };"
+        ]
+      ]
+    },
+    "no-copy-keys": {
+      "undoes": "C1 / C2 — ⌘C and ⌘X are listened for",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "    window.addEventListener('keydown', onKey);",
+          "    void onKey;"
+        ]
+      ]
+    },
+    "copy-while-editing": {
+      "undoes": "C1 — the caret in a text: the text's own copy",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "if (isEditing(e.target as Element | null) || isEditing(document.activeElement) || cellRangeShown()) return;",
+          "if (cellRangeShown()) return;"
+        ]
+      ]
+    },
+    "copy-on-cell-range": {
+      "undoes": "C1 — cells selected by dragging: not a block copy",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "if (isEditing(e.target as Element | null) || isEditing(document.activeElement) || cellRangeShown()) return;",
+          "if (isEditing(e.target as Element | null) || isEditing(document.activeElement)) return;"
+        ]
+      ]
+    },
+    "copy-under-dialog": {
+      "undoes": "C1 — nothing while a dialog is open",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "if (!o.enabled || o.selectedIds.size === 0 || o.dialogOpen()) return;",
+          "if (!o.enabled || o.selectedIds.size === 0) return;"
+        ]
+      ]
+    },
+    "copy-not-cancelled": {
+      "undoes": "C1 — the copy event carries the payload (the event cancelled, so the browser writes the page's data)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "      e.preventDefault();\n      wrote.current = true;",
+          "      wrote.current = true;"
+        ]
+      ]
+    },
+    "cut-keeps-blocks": {
+      "undoes": "C2 — ⌘X deletes the copied blocks",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "const refusal = ids.length ? o.remove(ids) : null;",
+          "const refusal = null;"
+        ]
+      ]
+    },
+    "cut-takes-chart": {
+      "undoes": "C2 — a chart is not cut (it was not copied)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "(b.locked || moved.includes(b))",
+          "(b.locked || moved.includes(b) || b.type === 'chart')"
+        ]
+      ]
+    },
+    "no-chart-toast": {
+      "undoes": "C1 — a chart left out says so",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "      if (charts) messages.push(chartsMessage(charts));\n",
+          ""
+        ]
+      ]
+    },
+    "no-refusal-toast": {
+      "undoes": "C4 — a refused block says why",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "...(refused.length ? [refusalMessage(refused)] : [])",
+          "...([] as string[])"
+        ]
+      ]
+    },
+    "no-invalid-toast": {
+      "undoes": "C6 — a payload that fails says so",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "      o.toast(CLIP_MESSAGES.invalid);\n",
+          ""
+        ]
+      ]
+    },
+    "paste-shares-file": {
+      "undoes": "D — a pasted image gets its own file (a storage copy)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "      const copied = await copyPosterImage(m.src!, userId, posterId, m.block.id);",
+          "      const copied = { path: m.src, missing: false };"
+        ]
+      ]
+    },
+    "poster-change-ignored": {
+      "undoes": "C3 / D — the copies' files go only into the poster they were pasted into (another poster opened before they land is not touched, and its toast is not shown there)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "    if (usePosterStore.getState().posterId !== posterId) return;\n",
+          ""
+        ],
+        [
+          "src/poster/useBlockClipboard.ts",
+          "  if (!files.length || st.posterId !== posterId || !st.doc) return;",
+          "  if (!files.length || !st.doc) return;"
+        ]
+      ]
+    },
+    "commit-each": {
+      "undoes": "C3 — one undo step for the paste",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "if (blocks.length) o.commit(blocks);",
+          "blocks.forEach((b) => o.commit([b]));"
+        ]
+      ]
+    },
+    "refused-pasted": {
+      "undoes": "C4 — refused blocks are not pasted",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "const { kept, refused } = admit(payload.blocks, doc.blocks);",
+          "const { refused } = admit(payload.blocks, doc.blocks);\n    const kept = payload.blocks;"
+        ]
+      ]
+    },
+    "blocks-not-handed": {
+      "undoes": "B1 — the canvas paste hands order 1 to the block paste",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "      if (what.kind === 'blocks') {\n        o.pasteBlocks(what.payload);\n        return;\n      }",
+          "      if (what.kind === 'blocks') return;"
+        ]
+      ]
+    },
+    "dup-shares-file": {
+      "undoes": "D — ⌘D's clone of an image gets its own file",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    if ((src.type === 'image' || src.type === 'logo') && isStoragePath(src.imageSrc)) {",
+          "    if (false) {"
+        ]
+      ]
+    },
+    "upload-same-name": {
+      "undoes": "D — every upload (Replace) writes a new file name",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "  const path = newImagePath(userId, posterId, blockId, imageExt(file));",
+          "  const path = `${userId}/${posterId}/${blockId}.${imageExt(file)}`;"
+        ]
+      ]
+    },
+    "copy-same-name": {
+      "undoes": "D — a copied file is named after its new block",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "    const to = newImagePath(userId, posterId, blockId, copiedExt(from));\n    const { error } = await supabase.storage.from(BUCKET).copy(from, to);",
+          "    const to = from.replace(/^[^/]+\\/[^/]+\\//, `${userId}/${posterId}/`);\n    const { error } = await supabase.storage.from(BUCKET).copy(from, to);"
+        ]
+      ]
+    },
+    "asset-path-dots": {
+      "undoes": "D / C6 — a poster-assets path has no \"..\" folder",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "`^[A-Za-z0-9-]{1,64}/[A-Za-z0-9-]{1,64}/",
+          "`^[A-Za-z0-9.-]{1,64}/[A-Za-z0-9.-]{1,64}/"
+        ]
+      ]
+    },
+    "name-not-random": {
+      "undoes": "D — a new file name each time",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "return `${userId}/${posterId}/${blockId}-${nanoid(8)}.${ext}`;",
+          "return `${userId}/${posterId}/${blockId}-copy0000.${ext}`;"
+        ]
+      ]
+    },
+    "ext-unsanitised": {
+      "undoes": "D — a storage name's extension is a plain one",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "  if (/^[a-z0-9]{1,8}$/.test(own)) return own;",
+          "  if (own) return own;"
+        ]
+      ]
+    },
+    "table-not-normalised": {
+      "undoes": "C1 — a stored table of an odd shape is written in the payload's shape, so a copy of the poster's own table always validates",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "tableData: b.type === 'table' && b.tableData ? tableToClip(b.tableData) : null,",
+          "tableData: b.type === 'table' ? b.tableData : null,"
+        ]
+      ]
+    },
+    "page-selection-ignored": {
+      "undoes": "C1 — text the user selected on the page since their last press on the canvas: ⌘C is the browser's copy of it (found by record 32's table-paste-check, record 35 §9)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "      if (selectedText().trim()) return;\n",
+          ""
+        ]
+      ]
+    },
+    "stray-selection-kept": {
+      "undoes": "C1 — a press on the canvas ends a text selection on the page (WebKit's rubber band leaves the words it crossed selected), so ⌘C then copies the blocks",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "      if (fromCanvas && !inTable && !multi && sel && !sel.isCollapsed && !isEditing(document.activeElement)) sel.removeAllRanges();",
+          "      void sel;"
+        ]
+      ]
+    },
+    "clear-while-editing": {
+      "undoes": "C1 — a press on the canvas leaves alone a selection while a field has the focus (words selected in a text being edited)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "      if (fromCanvas && !inTable && !multi && sel && !sel.isCollapsed && !isEditing(document.activeElement)) sel.removeAllRanges();",
+          "      if (fromCanvas && !inTable && !multi && sel && !sel.isCollapsed) sel.removeAllRanges();"
+        ]
+      ]
+    },
+    "clear-in-table": {
+      "undoes": "C1 — a press on the canvas leaves alone a selection made in a table (its cells dragged across)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "      if (fromCanvas && !inTable && !multi && sel && !sel.isCollapsed && !isEditing(document.activeElement)) sel.removeAllRanges();",
+          "      if (fromCanvas && !multi && sel && !sel.isCollapsed && !isEditing(document.activeElement)) sel.removeAllRanges();"
+        ]
+      ]
+    },
+    "no-cells-total": {
+      "undoes": "C6 (R1-1) — the payload's tables hold at most 2 500 cells in all",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "ok && tableCells((json as unknown as ClipPayload).blocks) <= CLIP_LIMITS.cellsInAll",
+          "ok"
+        ]
+      ]
+    },
+    "cut-takes-address-picture": {
+      "undoes": "C2 (R1-2) — ⌘X leaves on the poster a picture ⌘V could not bring back",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "const stay = key === 'x' ? blocks.filter((b) => !pictureTravels(b)) : [];",
+          "const stay: Block[] = [];"
+        ]
+      ]
+    },
+    "picture-travels-any": {
+      "undoes": "C2 (R1-2) — an address or a data URL is a picture that does not travel",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "return !(b.type === 'image' || b.type === 'logo') || !b.imageSrc || isPosterAssetSrc(b.imageSrc);",
+          "return !(b.type === 'image' || b.type === 'logo') || true;"
+        ]
+      ]
+    },
+    "no-stay-toast": {
+      "undoes": "C2 (R1-2) — a picture that stays says why",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "      if (stay.length) messages.push(picturesStayMessage(stay.length));\n",
+          ""
+        ]
+      ]
+    },
+    "cut-unvalidated": {
+      "undoes": "C1 / C2 (R1-4) — only a payload ⌘V accepts is written; else nothing is copied or cut",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "if (!readClip(clip.html)?.payload) {",
+          "if (false) {"
+        ]
+      ]
+    },
+    "no-too-large-toast": {
+      "undoes": "C1 / C2 (R1-4) — blocks too large to copy say so",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "          o.toast(CLIP_MESSAGES.tooLarge);\n",
+          ""
+        ]
+      ]
+    },
+    "dup-copy-fail-empty": {
+      "undoes": "D (R1-3; correction 5) — a clone whose file cannot be copied for a reason not about the file (storage busy, a refusal) keeps its original's file",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        const to = heldAfterCopy(from, copied);",
+          "        const to = copied.path;"
+        ]
+      ]
+    },
+    "legacy-name-refused": {
+      "undoes": "D (R1-3) — a file under an older name ({block}.{any extension}) is a poster-assets file, copied",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "\\\\.[${EXT_CHAR}](?:[${EXT_CHAR} ]{0,62}[${EXT_CHAR}])?$`",
+          "\\\\.[a-z0-9]{1,8}$`"
+        ]
+      ]
+    },
+    "legacy-ext-copied": {
+      "undoes": "D (R1-3) — a copy's new name takes a plain extension (else png)",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "return /^[a-z0-9]{1,8}$/.test(ext) ? ext : 'png';",
+          "return ext;"
+        ]
+      ]
+    },
+    "ext-query-allowed": {
+      "undoes": "C6 (R1-3) — an older name's extension has no ?, % or #",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "const EXT_CHAR = \"a-z0-9_!*'()&$@=;:+,\\\\-\";",
+          "const EXT_CHAR = \"a-z0-9_!*'()&$@=;:+,?%#\\\\-\";"
+        ]
+      ]
+    },
+    "charts-singular": {
+      "undoes": "C1 (R1-7) — several charts left out: \"the charts\"",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "'Charts can\\'t be copied, so the charts were left out.'",
+          "'Charts can\\'t be copied, so the chart was left out.'"
+        ]
+      ]
+    },
+    "paste-waits-for-copies": {
+      "undoes": "C3 (R2-1) — the copies go into the poster at once, one undo step, before their files are copied",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "    if (blocks.length) o.commit(blocks);\n    const copies: CopiedFile[] = await Promise.all(",
+          "    const copies: CopiedFile[] = await Promise.all("
+        ],
+        [
+          "src/poster/useBlockClipboard.ts",
+          "    settleCopiedFiles(posterId, copies);\n",
+          "    if (blocks.length) o.commit(blocks);\n    settleCopiedFiles(posterId, copies);\n"
+        ]
+      ]
+    },
+    "dup-waits-for-copy": {
+      "undoes": "D (R2-1) — ⌘D's clone is added at once, holding its original's file, before its own file is copied",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    setBlocks([...doc.blocks, clone]);\n    selectOne(clone.id);",
+          "    const addNow = !((src.type === 'image' || src.type === 'logo') && isStoragePath(src.imageSrc));\n    if (addNow) setBlocks([...doc.blocks, clone]);\n    selectOne(clone.id);"
+        ],
+        [
+          "src/poster/PosterEditor.tsx",
+          "        if (to === from) return;\n        settleCopiedFiles(poster, [{ id: clone.id, from, to }]);",
+          "        const latest = usePosterStore.getState();\n        if (latest.posterId === poster && latest.doc) setBlocks([...latest.doc.blocks, { ...clone, imageSrc: to }]);"
+        ]
+      ]
+    },
+    "swap-overrides-user": {
+      "undoes": "D (R2-1) — a copied file takes the place of what the block showed only while it still shows it (a Replace made meanwhile stays)",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "    if (!f || f.from === f.to || b.imageSrc !== f.from) return b;",
+          "    if (!f || f.from === f.to) return b;"
+        ]
+      ]
+    },
+    "swap-is-a-step": {
+      "undoes": "D (R2-1) — a copied file takes its place silently, not as an undo step (one ⌘Z undoes the paste or ⌘D)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "  if (next) st.setBlocksSilent(next);",
+          "  if (next) st.setBlocks(next);"
+        ]
+      ]
+    },
+    "foreign-src-shown": {
+      "undoes": "D / C6 (R2-1) — while copying, a pasted image shows its source only when that is this account's own file (never another account's path)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "const shown = src && isOwnFile(src, userId) ? src : null;",
+          "const shown = src;"
+        ]
+      ]
+    },
+    "own-src-hidden": {
+      "undoes": "D (R2-1) — while copying, a pasted image shows its source when that is this account's own file (and ⌘⇧Z after an early ⌘Z brings it back drawn)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "const shown = src && isOwnFile(src, userId) ? src : null;",
+          "const shown = null;"
+        ]
+      ]
+    },
+    "failed-copy-kept": {
+      "undoes": "D (R2-1; correction 5) — a pasted image whose own-folder file storage says is not there (its 404) is emptied, with the toast (not left on its source)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "to: heldAfterCopy(m.block.imageSrc, copied) };",
+          "to: copied.path ?? m.block.imageSrc };"
+        ]
+      ]
+    },
+    "crop-half": {
+      "undoes": "C1 / C6 (R2-2) — a crop the editor stores (a side up to 90 %) is carried and pasted as stored",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "const CROP: Record<string, Check> = { top: num(0, 100), right: num(0, 100), bottom: num(0, 100), left: num(0, 100) };",
+          "const CROP: Record<string, Check> = { top: num(0, 50), right: num(0, 50), bottom: num(0, 50), left: num(0, 50) };"
+        ]
+      ]
+    },
+    "border-dropped": {
+      "undoes": "C1 (R2-2's sibling) — a custom border of an older stored shape is carried in its known fields, not left out",
+      "edits": [
+        [
+          "src/poster/blockClipboard.ts",
+          "...(t.customBorder && typeof t.customBorder === 'object' ? { customBorder: borderToClip(t.customBorder) } : {})",
+          "...(t.customBorder && isBorder(t.customBorder) ? { customBorder: t.customBorder } : {})"
+        ]
+      ]
+    },
+    "busy-copy-emptied": {
+      "undoes": "D (R3-1) — a pasted image whose own-folder file storage could not copy just then (busy on every try) keeps showing that file, no toast",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "to: heldAfterCopy(m.block.imageSrc, copied) };",
+          "to: copied.path };"
+        ]
+      ]
+    },
+    "busy-not-reported": {
+      "undoes": "D (R3-1) — a copy that failed on a transient error every time is not taken for a missing file (the source is still there)",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "      return { path: null, missing: own && attempt === 1 && isMissingObjectError(error) };",
+          "      return { path: null, missing: own && ((attempt === 1 && isMissingObjectError(error)) || isTransientStorageError(error)) };"
+        ]
+      ]
+    },
+    "copy-destination-reused": {
+      "undoes": "D (the final check, F35-FC-1) — each try of a pasted image's copy writes a new name, so a retry after a try whose answer was lost (it made the copy) is not refused as a duplicate and the block gets its own file",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "  const own = isOwnFile(src, userId);\n  for (let attempt = 1; attempt <= attempts; attempt++) {",
+          "  const own = isOwnFile(src, userId);\n  const once = newImagePath(userId, posterId, blockId, copiedExt(from));\n  for (let attempt = 1; attempt <= attempts; attempt++) {"
+        ],
+        [
+          "src/data/posterImages.ts",
+          "    const to = newImagePath(userId, posterId, blockId, copiedExt(from));\n    const { error } = await supabase.storage.from(BUCKET).copy(from, to);",
+          "    const to = once;\n    const { error } = await supabase.storage.from(BUCKET).copy(from, to);"
+        ]
+      ]
+    },
+    "toast-counts-copies": {
+      "undoes": "D (R3-2) — the \"couldn't be copied\" toast names only the pasted images on the poster and empty when the copies have answered (not those undone meanwhile)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "    const lost = emptyOnPoster(posterId, emptied);",
+          "    const lost = emptied.size;"
+        ]
+      ]
+    },
+    "toast-ignores-replace": {
+      "undoes": "D (R3-2) — a pasted image the user filled meanwhile (a Replace) is not named by the toast",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "ids.has(b.id) && !b.imageSrc).length;",
+          "ids.has(b.id)).length;"
+        ]
+      ]
+    },
+    "history-keeps-source": {
+      "undoes": "D (R3-3) — a copied file takes the source's place in the undo and redo steps too",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "  st.rewriteHistory((blocks) => withCopiedFiles(blocks, files));\n",
+          ""
+        ]
+      ]
+    },
+    "undo-steps-not-rewritten": {
+      "undoes": "D (R3-3) — the undo steps are rewritten (an undo of a step made while copying keeps the copy's own file)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "    undoStack = undoStack.map(step);\n",
+          ""
+        ]
+      ]
+    },
+    "redo-steps-not-rewritten": {
+      "undoes": "D (R3-3) — the redo steps are rewritten (⌘⇧Z of a paste or clone undone before its file was copied brings back its own file)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "    redoStack = redoStack.map(step);\n",
+          ""
+        ]
+      ]
+    },
+    "drag-snapshot-stale": {
+      "undoes": "D (R3-3's sibling) — a drag's undo step is the blocks at release with their pre-drag geometry (a copied file landing mid-drag stays)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "setBlocksSilent(atPreDragGeometry(blocksRef.current, preDragBlocksRef.current));",
+          "setBlocksSilent(preDragBlocksRef.current);"
+        ]
+      ]
+    },
+    "drag-size-kept": {
+      "undoes": "(R3-3's sibling) — a drag's undo step restores the pre-drag size",
+      "edits": [
+        [
+          "src/poster/dragStep.ts",
+          "x: p.x, y: p.y, w: p.w, h: p.h,",
+          "x: p.x, y: p.y,"
+        ]
+      ]
+    },
+    "drag-rotation-kept": {
+      "undoes": "(R3-3's sibling) — a drag's undo step restores the pre-drag rotation (and none when there was none)",
+      "edits": [
+        [
+          "src/poster/dragStep.ts",
+          "    const { rotation: _rotation, ...rest } = b;\n    return { ...rest, x: p.x, y: p.y, w: p.w, h: p.h, ...(p.rotation !== undefined ? { rotation: p.rotation } : {}) };",
+          "    return { ...b, x: p.x, y: p.y, w: p.w, h: p.h };"
+        ]
+      ]
+    },
+    "multi-click-cleared": {
+      "undoes": "C1 (R3-4) — a press on the canvas leaves alone the words a double- or triple-click selects (⌘C is the browser's copy of them)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "      if (fromCanvas && !inTable && !multi && sel && !sel.isCollapsed && !isEditing(document.activeElement)) sel.removeAllRanges();",
+          "      if (fromCanvas && !inTable && sel && !sel.isCollapsed && !isEditing(document.activeElement)) sel.removeAllRanges();"
+        ]
+      ]
+    },
+    "click-count-ignored": {
+      "undoes": "C1 (R3-4) — the click count is read at mousedown (a double-click's words kept)",
+      "edits": [
+        [
+          "src/poster/useBlockClipboard.ts",
+          "      multi = e.detail >= 2;",
+          "      multi = false;"
+        ]
+      ]
+    },
+    "refusal-empties-own-file": {
+      "undoes": "D (correction 5, the lead's rule on F35-FC-2) — a refusal that is not about the file (403, an expired token's InvalidJWT, 409) keeps a pasted image or a ⌘D clone on its own-folder source, with no toast",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "      return { path: null, missing: own && attempt === 1 && isMissingObjectError(error) };",
+          "      return { path: null, missing: own && attempt === 1 && !isTransientStorageError(error) };"
+        ]
+      ]
+    },
+    "missing-file-kept": {
+      "undoes": "D (correction 5) — a pasted image or a ⌘D clone whose own-folder source storage says is not there (404 / not_found) is emptied, with the toast",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "      return { path: null, missing: own && attempt === 1 && isMissingObjectError(error) };",
+          "      return { path: null, missing: false };"
+        ]
+      ]
+    },
+    "busy-then-404-emptied": {
+      "undoes": "D (correction 5, F35-FC-2) — a 404 after a busy try is not a plain \"missing\": the image keeps its source",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "      return { path: null, missing: own && attempt === 1 && isMissingObjectError(error) };",
+          "      return { path: null, missing: own && isMissingObjectError(error) };"
+        ]
+      ]
+    },
+    "missing-in-any-folder": {
+      "undoes": "D (correction 5) — `missing` is about the user's own folder: another account's file, which storage answers 404 for whether or not it exists, is never \"missing\" (⌘D's clone of one keeps it, as before)",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "      return { path: null, missing: own && attempt === 1 && isMissingObjectError(error) };",
+          "      return { path: null, missing: attempt === 1 && isMissingObjectError(error) };"
+        ]
+      ]
+    },
+    "missing-any-404": {
+      "undoes": "D (correction 5) — only storage's own word that the object is not found counts as missing (not a gateway's or a router's 404 page, nor a missing bucket)",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "  return Number(err.statusCode) === 404 && /\\b(object|resource)\\b.*\\bnot found\\b/i.test(err.message ?? '');",
+          "  return Number(err.statusCode) === 404;"
+        ]
+      ]
+    },
+    "dup-missing-kept": {
+      "undoes": "D (correction 5, one rule with ⌘V) — ⌘D's clone of an own-folder file storage says is not there is emptied",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        const to = heldAfterCopy(from, copied);",
+          "        const to = copied.path ?? from;"
+        ]
+      ]
+    },
+    "dup-missing-no-toast": {
+      "undoes": "D (correction 5) — ⌘D's clone emptied because its file is not there shows the paste's \"couldn't be copied\" toast",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        if (!to && emptyOnPoster(poster, new Set([clone.id]))) showToast(imagesLostMessage(1));",
+          "        void emptyOnPoster; void imagesLostMessage;"
+        ]
+      ]
+    },
+    "rule-before-correction-5": {
+      "undoes": "D (correction 5, F35-FC-2) — the code before correction 5: a pasted image emptied on any refusal of its copy, and ⌘D's clone never emptied",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "      return { path: null, missing: own && attempt === 1 && isMissingObjectError(error) };",
+          "      return { path: null, missing: !isTransientStorageError(error) };"
+        ],
+        [
+          "src/poster/PosterEditor.tsx",
+          "        const to = heldAfterCopy(from, copied);",
+          "        const to = copied.path ?? from;"
+        ]
+      ]
+    },
+    "dup-toast-not-on-poster": {
+      "undoes": "D (correction 5, R3-2's rule for ⌘D) — the toast for ⌘D's emptied clone only while the clone is on the poster and empty (not after a ⌘Z pressed before its copy answered)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        if (!to && emptyOnPoster(poster, new Set([clone.id]))) showToast(imagesLostMessage(1));",
+          "        if (!to) showToast(imagesLostMessage(1));"
+        ]
+      ]
+    }
+  }
+}

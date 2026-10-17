@@ -20,6 +20,9 @@
  * - paste (capture, on document): a paste is an undo step of its own. The
  *   paste event says so in every engine; the text editor's own paste runs
  *   execCommand, whose input event says '' or 'insertText' (review R1-F2).
+ * - cut (capture, on document): the same for a cut, which the text editor
+ *   takes for a superscript or subscript cut alone and deletes itself, with
+ *   no beforeinput (record 39 §9, R1-F1).
  * - input (capture, on document) of type historyUndo / historyRedo: the
  *   browser applied its own history with no beforeinput to cancel first
  *   (Chromium's and Firefox's execCommand, review R1-F3). Nothing is stored
@@ -37,6 +40,7 @@ import { breakUndoCoalescing } from '@/stores/posterStore';
 import {
   noteBeforeInput,
   noteCompositionStart,
+  noteCut,
   noteHistoryInput,
   notePaste,
   resetInputHint,
@@ -117,6 +121,7 @@ export function useEditorHistory({ onRun }: { onRun: (dir: HistoryDirection) => 
     window.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('beforeinput', onBeforeInput, true);
     document.addEventListener('paste', notePaste, true);
+    document.addEventListener('cut', noteCut, true);
     document.addEventListener('input', onInput, true);
     document.addEventListener('compositionstart', onCompositionStart, true);
     document.addEventListener('focusin', endStep, true);
@@ -124,6 +129,7 @@ export function useEditorHistory({ onRun }: { onRun: (dir: HistoryDirection) => 
       window.removeEventListener('keydown', onKeyDown, true);
       document.removeEventListener('beforeinput', onBeforeInput, true);
       document.removeEventListener('paste', notePaste, true);
+      document.removeEventListener('cut', noteCut, true);
       document.removeEventListener('input', onInput, true);
       document.removeEventListener('compositionstart', onCompositionStart, true);
       document.removeEventListener('focusin', endStep, true);

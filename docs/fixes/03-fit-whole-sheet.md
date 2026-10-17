@@ -815,7 +815,12 @@ control) and 4 as weaker (3 one tree, 1 code only), all 4 below confidence
 **Blind spots, falsified in the browser** (`blind-spot-check.mjs`,
 MEASURED): `ruler-origin-96`, `tour-no-scroll` and
 `tour-scroll-into-view-everything` are guarded (their scenarios go red with
-the mutant served). Accepted unguarded, with reasons in the specs: the
+the mutant served). (`ruler-origin-96` was retired on 2026-09-30 by fix 04:
+the ruler formula it mutated was removed when the rulers moved to
+`WorkspaceRulers.tsx` and began reading where the sheet is laid out, and fix
+04's own spec guards them; left in place, it made the whole fit spec stop as
+a bad spec, found by fix 04's step 9 review, CR9-04-02, and reproduced by its
+skeptic.) Accepted unguarded, with reasons in the specs: the
 whole-pixel floor (reached: fractional canvases in 664 of 720 of R2's
 sweep steps; yet without the floor, a visible defect (overflow, a scrollbar,
 a hidden sheet) in 0 of 720, MEASURED by R2) and the guarded media read (no environment here lacks a window

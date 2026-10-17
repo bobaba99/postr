@@ -12,7 +12,14 @@
  *     itself lives in a sibling component and is wired up by the
  *     consumer via onSelectionChange).
  *   - Slash commands using the shared matchSlashAtCaret helper,
- *     with a contentEditable caret adapter.
+ *     with a contentEditable caret adapter: "/" at the start of a word
+ *     opens the symbol menu (all 65 symbols, filtered as letters follow);
+ *     ↑ ↓ move its highlight, Tab or a click inserts the highlighted
+ *     symbol, Enter inserts it only after an arrow moved the highlight
+ *     (otherwise Enter closes the menu and does what Enter does in the
+ *     block), Esc closes it (record docs/fixes/39-text-editing.md, rule T4).
+ *   - Superscript and subscript: PowerPoint's keys toggle them on the
+ *     selection while the caret is in this text (scriptFormat.ts, rule T2).
  *   - Paste sanitization: every paste is run through sanitizeHtml
  *     so stored XSS from copied-from-elsewhere markup is defanged, and
  *     takes the poster's style (pasteClean.ts: the source's colour,
@@ -56,8 +63,11 @@ import { breakUndoCoalescing } from '@/stores/posterStore';
 import type { EditorSurface } from './editorHistory';
 import { useEditableHistory } from './useEditableHistory';
 import { SYMBOLS, filterSymbols } from './symbols';
-import { matchSlashAtCaret } from './slashCommand';
-import { htmlToPlainText, sanitizeHtml, sanitizeTyped } from './sanitizeHtml';
+import { matchSlashAtCaret, textBeforeCaretByLine } from './slashCommand';
+import { listState, scriptKeyAction, scriptState, toggleScript } from './scriptFormat';
+import { deleteIn, scriptedCopy } from './scriptClipboard';
+import { MAC } from './selectionKeys';
+import { sanitizeHtml, sanitizeTyped } from './sanitizeHtml';
 import { pastedHtml } from './pasteClean';
 import { imageOnlyPaste } from './canvasPaste';
 import { isBlankHtml } from './startingText';
@@ -71,6 +81,11 @@ export interface SelectionInfo {
     italic: boolean;
     underline: boolean;
     strikethrough: boolean;
+    /** Read from the markup (scriptFormat.ts): the engines' own state is wrong for sub and sup here. */
+    superscript: boolean;
+    subscript: boolean;
+    bulletList: boolean;
+    numberedList: boolean;
   };
 }
 
@@ -109,9 +124,49 @@ interface SlashMenuState {
   prefix: string;
   /** Viewport coords of the caret for positioning. */
   caretRect: DOMRect | null;
+  /** The highlighted entry's index: Tab inserts it, and Enter once an arrow moved it. */
+  active: number;
+  /** An arrow key moved the highlight: only then does Enter insert (rule T4). */
+  moved: boolean;
 }
 
-const INITIAL_SLASH: SlashMenuState = { open: false, prefix: '', caretRect: null };
+const INITIAL_SLASH: SlashMenuState = { open: false, prefix: '', caretRect: null, active: 0, moved: false };
+
+/** The menu's height at most, and its gap from the caret and from the window's edge. */
+const MENU_MAX = 220;
+const MENU_GAP = 6;
+const MENU_EDGE = 8;
+
+/**
+ * Where the menu goes: below the caret, or above it when it would reach
+ * past the window's bottom there and there is more room above; never
+ * taller than its side's room. Near the bottom it used to be drawn partly
+ * below the window, and ↑ took the highlight to an entry out of sight
+ * (record 39 §9, R1-F5).
+ */
+function menuPlacement(caret: DOMRect, windowHeight: number): { top?: number; bottom?: number; left: number; maxHeight: number } {
+  const below = windowHeight - caret.bottom - MENU_GAP - MENU_EDGE;
+  const above = caret.top - MENU_GAP - MENU_EDGE;
+  if (below >= MENU_MAX || below >= above) return { top: caret.bottom + MENU_GAP, left: caret.left, maxHeight: Math.max(0, Math.min(MENU_MAX, below)) };
+  return { bottom: windowHeight - caret.top + MENU_GAP, left: caret.left, maxHeight: Math.min(MENU_MAX, above) };
+}
+
+/** Every symbol whose name starts with `prefix`: the bare "/" lists all 65. */
+const slashEntries = (prefix: string) => filterSymbols(prefix, Number.POSITIVE_INFINITY);
+
+/** The format state of the selection in `el` (the toolbar's highlighting). */
+function formatsOf(el: HTMLElement, range: Range): SelectionInfo['formats'] {
+  return {
+    bold: document.queryCommandState('bold'),
+    italic: document.queryCommandState('italic'),
+    underline: document.queryCommandState('underline'),
+    strikethrough: document.queryCommandState('strikeThrough'),
+    superscript: scriptState(el, range, 'sup'),
+    subscript: scriptState(el, range, 'sub'),
+    bulletList: listState(el, range, 'UL'),
+    numberedList: listState(el, range, 'OL'),
+  };
+}
 
 /**
  * Returns the character offset of the current selection's start
@@ -135,14 +190,22 @@ function getCaretPlainOffset(root: Node): number | null {
  * reaches `offset`, then returns a Range collapsed at that point.
  * Used when inserting slash-command symbols: we need to turn a
  * plain-text character offset back into a DOM position.
+ *
+ * At a boundary between two text nodes a `start` point goes into the
+ * later one and an `end` point into the earlier one. A `/` typed at the
+ * start of a line made with Enter is the first character of a text node
+ * on that line (in its <div>, or after a <br>); its start used to be put
+ * at the end of the line before, so the symbol's insertion deleted the
+ * line break and joined the two lines ("ZQJ1", Enter, "/al", Tab gave
+ * "ZQJ1α", MEASURED in Chromium and Firefox on main, record 39 §4).
  */
-function rangeFromPlainOffset(root: Node, offset: number): Range | null {
+function rangeFromPlainOffset(root: Node, offset: number, side: 'start' | 'end'): Range | null {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let consumed = 0;
   let node = walker.nextNode() as Text | null;
   while (node) {
     const len = node.data.length;
-    if (consumed + len >= offset) {
+    if (side === 'start' ? consumed + len > offset : consumed + len >= offset) {
       const range = document.createRange();
       range.setStart(node, offset - consumed);
       range.collapse(true);
@@ -174,6 +237,8 @@ export function RichTextEditor({
   const ref = useRef<HTMLDivElement | null>(null);
   const [slash, setSlash] = useState<SlashMenuState>(INITIAL_SLASH);
   const [focused, setFocused] = useState(false);
+  /** The last keydown was a plain ↑ ↓ that the menu took (handleKeyDown): its keyup leaves the menu alone. */
+  const menuArrow = useRef(false);
   // Empty for the grey prompt (index.css reads data-empty; record 29). Read
   // from the stored value: the prompt shows only while the block has no
   // focus (index.css), and by then the typing is stored.
@@ -210,53 +275,93 @@ export function RichTextEditor({
   const recomputeSlash = () => {
     const el = ref.current;
     if (!el) return;
-    const offset = getCaretPlainOffset(el);
-    if (offset == null) {
-      setSlash((prev) => (prev.open ? INITIAL_SLASH : prev));
-      return;
-    }
-    const text = htmlToPlainText(el.innerHTML);
-    const match = matchSlashAtCaret(text.substring(0, offset));
-    if (!match) {
-      setSlash((prev) => (prev.open ? INITIAL_SLASH : prev));
-      return;
-    }
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
+    const before = sel && sel.isCollapsed ? textBeforeCaretByLine(el) : null;
+    const match = before == null ? null : matchSlashAtCaret(before);
+    // Open only with something to list: a "/zz" that names no symbol is
+    // text, and Esc there is the editor's (record 36), not a hidden menu's.
+    if (!match || !sel || slashEntries(match.prefix).length === 0) {
+      setSlash((prev) => (prev.open ? INITIAL_SLASH : prev));
+      return;
+    }
     const rect = sel.getRangeAt(0).getBoundingClientRect();
-    setSlash({ open: true, prefix: match.prefix, caretRect: rect });
+    setSlash({ open: true, prefix: match.prefix, caretRect: rect, active: 0, moved: false });
   };
 
   const insertSymbolAt = (symbolKey: string) => {
-    insertSymbolViaExec(symbolKey, ref, commit, setSlash);
+    insertSymbol(symbolKey, ref, commit, setSlash);
   };
 
   const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
     history.commitInput(e.nativeEvent, read, onChange);
     recomputeSlash();
+    // A format change leaves the selection where it was, and Firefox then
+    // fires no selectionchange: the toolbar's state is read again here, so
+    // B shows pressed after B (record 39, TE1b).
+    emitSelection();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Escape' && slash.open) {
+    menuArrow.current = false;
+    // PowerPoint's superscript and subscript keys, taken only here, in
+    // text (rule T2); the selection is toggled, one undo step.
+    const script = scriptKeyAction(e.nativeEvent, MAC);
+    if (script) {
       e.preventDefault();
-      setSlash(INITIAL_SLASH);
+      toggleScript(script);
       return;
     }
-    if (slash.open && (e.key === 'Tab' || e.key === 'Enter')) {
-      const items = filterSymbols(slash.prefix, 1);
-      if (items.length > 0 && items[0]) {
+    // The menu is open only while it lists something (recomputeSlash).
+    if (slash.open && !e.nativeEvent.isComposing) {
+      const items = slashEntries(slash.prefix);
+      const plain = !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey;
+      if (e.key === 'Escape') {
         e.preventDefault();
-        insertSymbolAt(items[0][0]);
+        setSlash(INITIAL_SLASH);
         return;
+      }
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && plain) {
+        e.preventDefault();
+        menuArrow.current = true;
+        const step = e.key === 'ArrowDown' ? 1 : -1;
+        setSlash((prev) => ({ ...prev, active: (prev.active + step + items.length) % items.length, moved: true }));
+        return;
+      }
+      const chosen = items[Math.min(slash.active, items.length - 1)]!;
+      if (e.key === 'Tab' && plain) {
+        e.preventDefault();
+        insertSymbolAt(chosen[0]);
+        return;
+      }
+      if (e.key === 'Enter') {
+        if (slash.moved && plain) {
+          e.preventDefault();
+          insertSymbolAt(chosen[0]);
+          return;
+        }
+        // No arrow moved the highlight: Enter is the block's own (a new
+        // line in text; nothing in a title or heading, below).
+        setSlash(INITIAL_SLASH);
       }
     }
     // Single-line mode: swallow Enter so title/heading stays one line.
-    if (!multiline && e.key === 'Enter' && !slash.open) {
+    if (!multiline && e.key === 'Enter') {
       e.preventDefault();
     }
   };
 
   const handleKeyUp = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // The ↑ ↓ the menu took moved its highlight, not the caret: the menu is
+    // not read again (that would put the highlight back on the first entry).
+    // Any other ↑ ↓, such as Shift + ↓, was the text's (handleKeyDown leaves
+    // it): it moved the selection, so the menu is read again and closes on a
+    // selection (record 39 §9, R1-F6: it stayed open and Tab inserted a
+    // symbol). Known from the keydown, not this keyup's modifiers: Shift may
+    // be let go before the arrow.
+    if (menuArrow.current && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      menuArrow.current = false;
+      return;
+    }
     // A caret moved by key ends the typing step (the next word typed
     // elsewhere is undone on its own).
     history.onCaretKey(e);
@@ -305,6 +410,26 @@ export function RichTextEditor({
     commit();
   };
 
+  // A copy or cut of superscript or subscript text alone: the editor writes
+  // the clipboard, which Chromium and WebKit wrote as plain text
+  // (scriptClipboard.ts; record 39 §9, R1-F1). Any other is the browser's.
+  const handleCopy = (e: React.ClipboardEvent<HTMLDivElement>, cut: boolean) => {
+    const el = ref.current;
+    const sel = window.getSelection();
+    if (!el || !sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const copy = scriptedCopy(el, range);
+    if (!copy) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/html', copy.html);
+    e.clipboardData.setData('text/plain', copy.text);
+    if (!cut) return;
+    // An undo step of its own: the cut event says so (useEditorHistory.ts).
+    deleteIn(el, range);
+    commit();
+    emitSelection();
+  };
+
   const handleFocus = () => setFocused(true);
   const handleBlur = () => {
     setFocused(false);
@@ -320,47 +445,41 @@ export function RichTextEditor({
     onSelectionChange?.(null);
   };
 
-  // Selection change → emit to parent (toolbar positioning).
+  // Selection change → emit to parent (toolbar positioning and state).
+  const selectionListener = useRef(onSelectionChange);
+  selectionListener.current = onSelectionChange;
+  const emitSelection = () => {
+    const notify = selectionListener.current;
+    const el = ref.current;
+    if (!notify || !el) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) {
+      notify(null);
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    // Must be inside our editor, and a selection, not a caret.
+    if (!el.contains(range.commonAncestorContainer) || range.collapsed) {
+      notify(null);
+      return;
+    }
+    notify({ rect: range.getBoundingClientRect(), formats: formatsOf(el, range) });
+  };
   useEffect(() => {
     if (!onSelectionChange) return;
-    const handler = () => {
-      const el = ref.current;
-      if (!el) return;
-      const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) {
-        onSelectionChange(null);
-        return;
-      }
-      const range = sel.getRangeAt(0);
-      // Must be inside our editor
-      if (!el.contains(range.commonAncestorContainer)) {
-        onSelectionChange(null);
-        return;
-      }
-      if (range.collapsed) {
-        onSelectionChange(null);
-        return;
-      }
-      const rect = range.getBoundingClientRect();
-      onSelectionChange({
-        rect,
-        formats: {
-          bold: document.queryCommandState('bold'),
-          italic: document.queryCommandState('italic'),
-          underline: document.queryCommandState('underline'),
-          strikethrough: document.queryCommandState('strikeThrough'),
-        },
-      });
-    };
-    document.addEventListener('selectionchange', handler);
-    return () => document.removeEventListener('selectionchange', handler);
+    document.addEventListener('selectionchange', emitSelection);
+    return () => document.removeEventListener('selectionchange', emitSelection);
+    // emitSelection reads the latest props through refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onSelectionChange]);
 
   const stopDrag = (e: React.PointerEvent) => {
     if (stopPointerDown) e.stopPropagation();
   };
 
-  const slashItems = slash.open ? filterSymbols(slash.prefix, 8) : [];
+  const slashItems = slash.open ? slashEntries(slash.prefix) : [];
+  const activeIndex = Math.min(slash.active, Math.max(0, slashItems.length - 1));
+  const menuAt = slash.caretRect ? menuPlacement(slash.caretRect, window.innerHeight) : null;
 
   return (
     <>
@@ -377,6 +496,8 @@ export function RichTextEditor({
         onKeyDown={handleKeyDown}
         onKeyUp={handleKeyUp}
         onPaste={handlePaste}
+        onCopy={(e) => handleCopy(e, false)}
+        onCut={(e) => handleCopy(e, true)}
         onFocus={handleFocus}
         onBlur={handleBlur}
         onPointerDown={stopDrag}
@@ -399,7 +520,7 @@ export function RichTextEditor({
           doesn't scale it 2.6×. */}
       {focused &&
         slash.open &&
-        slash.caretRect &&
+        menuAt &&
         slashItems.length > 0 &&
         createPortal(
           <div
@@ -408,28 +529,30 @@ export function RichTextEditor({
             data-postr-takes-escape=""
             style={{
               position: 'fixed',
-              top: slash.caretRect.bottom + 6,
-              left: slash.caretRect.left,
+              top: menuAt.top,
+              bottom: menuAt.bottom,
+              left: menuAt.left,
               background: '#1a1a2e',
               border: '1px solid #3a3a4a',
               borderRadius: 6,
               padding: 4,
               zIndex: 9600,
-              maxHeight: 220,
+              maxHeight: menuAt.maxHeight,
               overflow: 'auto',
               boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
               minWidth: 180,
               fontFamily: 'system-ui',
             }}
           >
-            {slashItems.map(([k, sym]) => (
+            {slashItems.map(([k, sym], i) => (
               <div
                 key={k}
                 role="option"
-                aria-selected={false}
+                aria-selected={i === activeIndex}
+                ref={i === activeIndex ? (node) => node?.scrollIntoView?.({ block: 'nearest' }) : undefined}
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  insertSymbolViaExec(k, ref, commit, setSlash);
+                  insertSymbol(k, ref, commit, setSlash);
                 }}
                 style={{
                   padding: '6px 10px',
@@ -440,6 +563,7 @@ export function RichTextEditor({
                   justifyContent: 'space-between',
                   gap: 16,
                   borderRadius: 4,
+                  background: i === activeIndex ? '#7c6aed33' : 'transparent',
                 }}
               >
                 <span style={{ color: '#7c6aed', fontFamily: 'monospace', fontSize: 12 }}>/{k}</span>
@@ -447,7 +571,7 @@ export function RichTextEditor({
               </div>
             ))}
             <div style={{ fontSize: 10, color: '#666', padding: '4px 10px', borderTop: '1px solid #333' }}>
-              Tab or Enter to insert
+              Tab or click to insert · ↑ ↓ then Enter
             </div>
           </div>,
           document.body,
@@ -479,7 +603,7 @@ export function RichTextEditor({
             }}
           >
             Select text to format ·{' '}
-            <span style={{ color: '#c8b6ff', fontFamily: 'monospace' }}>/</span> for symbols
+            <span style={{ color: '#c8b6ff', fontFamily: 'monospace' }}>/</span> at the start of a word for symbols
           </div>,
           document.body,
         )}
@@ -491,8 +615,17 @@ export function RichTextEditor({
  * Insert a symbol at the current caret, replacing the slash prefix.
  * Extracted to a free function so the dropdown's onMouseDown can
  * reach it without closure-related staleness issues.
+ *
+ * The `/prefix` is replaced in the DOM itself and the field committed: one
+ * undo step, as a letter typed over a selection is (stores/historySteps.ts).
+ * It used to be selected and replaced with execCommand('insertText'), and
+ * Firefox's insertText over the whole text of a line made with Shift +
+ * Enter (the text after a <br>) deleted the <br> too: "ZQB2", Shift + Enter,
+ * "/al", Tab gave "ZQB2α" (MEASURED, keep-work-check TE4jb and TE4jl, a
+ * list item the same; Chromium and WebKit kept the line; record 39 §9,
+ * review round 1, R1-F2).
  */
-function insertSymbolViaExec(
+function insertSymbol(
   symbolKey: string,
   editorRef: React.RefObject<HTMLDivElement | null>,
   commit: () => void,
@@ -505,31 +638,45 @@ function insertSymbolViaExec(
   const caret = getCaretPlainOffset(el);
   if (caret == null) return;
 
-  const plain = htmlToPlainText(el.innerHTML);
-  const match = matchSlashAtCaret(plain.substring(0, caret));
+  const before = textBeforeCaretByLine(el);
+  const match = before == null ? null : matchSlashAtCaret(before);
   if (!match) return;
+  // The `/prefix` is the last characters before the caret (it holds no
+  // line break), counted as the caret's offset is.
+  const literalStart = caret - match.literal.length;
 
   const sel = window.getSelection();
   if (!sel) return;
 
   // Focus the editor before manipulating selection — the mouseDown
-  // on the dropdown didn't steal focus (we called preventDefault)
-  // but we still need to guarantee it for execCommand.
+  // on the dropdown didn't steal focus (we called preventDefault).
   el.focus();
 
-  // Build a Range that covers the `/prefix` text and select it,
-  // so the upcoming insertText replaces it atomically.
-  const startRange = rangeFromPlainOffset(el, match.before.length);
-  const endRange = rangeFromPlainOffset(el, caret);
+  // The Range that covers the `/prefix` text: its start in the later text
+  // node at a boundary (the line it is on), its end in the earlier.
+  const startRange = rangeFromPlainOffset(el, literalStart, 'start');
+  const endRange = rangeFromPlainOffset(el, caret, 'end');
   if (!startRange || !endRange) return;
 
-  const selectionRange = document.createRange();
-  selectionRange.setStart(startRange.startContainer, startRange.startOffset);
-  selectionRange.setEnd(endRange.startContainer, endRange.startOffset);
+  const prefix = document.createRange();
+  prefix.setStart(startRange.startContainer, startRange.startOffset);
+  prefix.setEnd(endRange.startContainer, endRange.startOffset);
+  prefix.deleteContents();
+  let at: [Node, number];
+  if (prefix.startContainer.nodeType === Node.TEXT_NODE) {
+    const text = prefix.startContainer as Text;
+    text.insertData(prefix.startOffset, symbol);
+    at = [text, prefix.startOffset + symbol.length];
+  } else {
+    const text = document.createTextNode(symbol);
+    prefix.insertNode(text);
+    at = [text, symbol.length];
+  }
+  const after = document.createRange();
+  after.setStart(...at);
+  after.collapse(true);
   sel.removeAllRanges();
-  sel.addRange(selectionRange);
-
-  document.execCommand('insertText', false, symbol);
+  sel.addRange(after);
 
   setSlash(INITIAL_SLASH);
   commit();

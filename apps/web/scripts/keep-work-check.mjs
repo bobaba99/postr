@@ -17,7 +17,10 @@
  * poster saved elsewhere meanwhile, the session ended),
  * lib/keepWorkLimits.mjs (limits the fix leaves: a paste into a table
  * cell, an outage during a token refresh, a size field's draft, Enter in an
- * emptied Poster name field); helpers lib/keepWorkKit.mjs.
+ * emptied Poster name field), lib/keepWorkTextEdit.mjs (record 39, text
+ * editing like PowerPoint: the format bar's x² and x₂, PowerPoint's
+ * superscript and subscript keys, sub- and superscript kept everywhere, the
+ * "/" symbol menu; `--only TE`); helpers lib/keepWorkKit.mjs.
  *
  * CLAIMS (a claim is OBSERVED when the defect is present)
  *   E1   " ZQA", Enter, "ZQB" in a text block: the stored text has no line
@@ -123,6 +126,71 @@
  *        field's button counts: "Save" there says the name is not stored).
  *        Round 2 of the restarted review, N2-F3 (fix 27, section 9)
  *
+ * TEXT EDITING (record 39, docs/fixes/39-text-editing.md; lib/keepWorkTextEdit.mjs)
+ *   TE1  " ZQH2O" typed in text block 1, the "2" selected with Shift + ←:
+ *        the format bar's buttons are not B, I, U, x², x₂, •, 1., Clear in
+ *        that order; TE1a x² clicked: "ZQH<sup>2</sup>O" not stored; TE1s
+ *        x² not pressed or x₂ pressed then; TE1u one ⌘Z does not take the
+ *        superscript away and keep the word (stored and drawn); TE1r ⌘⇧Z
+ *        does not put it back; TE1t x² again does not remove it; TE1x x²
+ *        then x₂ does not leave subscript only; TE1xs the bar not saying so
+ *   TE1l "ZQL1" made a bulleted line with "•" and selected: • not pressed
+ *        or 1. pressed; TE1b B pressed on it, B not shown pressed
+ *   TE2  " ZQK2O", the "2" selected: Control + Shift + = does not store
+ *        superscript; TE2p its keydown not cancelled in text; TE2u one ⌘Z
+ *        does not undo it; TE2t the key twice more not on then off; TE2b
+ *        Control + = not subscript; TE2m ⌘ + Control + Shift + = (Microsoft's
+ *        Mac table) not superscript; TE2o outside text (the workspace
+ *        clicked) the keys cancelled or the poster changed; TE2z ⌘ + = (the
+ *        Mac browsers' zoom) cancelled in text (on a macOS host)
+ *   TE2w navigator.platform "Win32": Ctrl + Shift + = and Ctrl + = not
+ *        superscript / subscript, or ⌘ + Control + Shift + = taken; TE2wt the
+ *        x² / x₂ titles not "Superscript (Ctrl+Shift+=)", "Subscript (Ctrl+=)"
+ *   TE3a " ZQH2O ZQCO2 ZQEND" with the "2"s made x² and x₂ on the bar, then
+ *        " ZQMORE" typed at the end: both not stored; TE3r not drawn after a
+ *        reload; TE3p in the print window (Save PDF) the "2"s not raised /
+ *        lowered (their glyph centres against the letter before, over
+ *        -0.1 em / under +0.05 em); TE3x the PowerPoint file's "2" runs
+ *        without a positive / negative baseline; TE3c "ZQH2O" copied with
+ *        the engine's ⌘C into text block 2 with ⌘V: no superscript stored
+ *   TE3s… the same five (TE3sa … TE3sc) with the sub- and superscript put
+ *        there by a paste of another application's HTML (no bar needed)
+ *   TE4w each of "n/a", "mg/kg", "w/", "μg/d", "see Fig. 2/", "and/or",
+ *        "24/7", "km/h" typed on its own line, then Enter: a line not stored
+ *        as typed; TE4wm the menu open before an Enter
+ *   TE4n "/" at the block's start: the menu not open with every symbol
+ *        (symbols.ts holds 65); TE4h the first entry not highlighted, or ↓
+ *        not moving it to the second; TE4x Esc: the menu still open, the
+ *        caret out of the block or the text changed; TE4e "/al", Enter (no
+ *        arrow): the menu still open, or the line not stored as "/al";
+ *        TE4s "x /a": no menu after a space; TE4k ↓ then Enter not inserting
+ *        the second entry (≈); TE4l no menu at a line start; TE4t Tab not
+ *        inserting α; TE4c a click on √ not inserting it
+ *   TE4j "ZQJ1", Enter, "/al", Tab, " ZQJ2": not stored as two lines
+ *        "ZQJ1" and "α ZQJ2" (the symbol joined the lines on main)
+ *   TE4ti the title: "ZQT /al" (menu open), Enter: the menu still open, or
+ *        the title not "ZQT /al" (a symbol or a line break added)
+ *   From record 39's review round 1 (section 9):
+ *   TE3i " ZQH2O ZQC2X ZQBOLDY" with x², x₂ and B from the bar; ONLY the
+ *        superscript "2" copied with ⌘C, pasted with ⌘V into text block 2:
+ *        no superscript stored (R1-F1); TE3ib the same for the subscript
+ *        "2"; TE3ik for "OL" of the bold word (a guard: the engines keep
+ *        it); TE3ix the superscript "2" cut with ⌘X: not removed; TE3ixu one
+ *        ⌘Z not putting it back, or ⌘⇧Z not taking it again; TE3ixp its ⌘V:
+ *        no superscript stored
+ *   TE4jb "ZQB1", Enter, "ZQB2", Shift + Enter, "/al", Tab, " ZQBE": not the
+ *        lines "ZQB1", "ZQB2", "α ZQBE" (R1-F2: Firefox deleted the line
+ *        break); TE4ju the third line after Tab, one ⌘Z and one ⌘⇧Z not "α",
+ *        "/al", "α"; TE4jl a bulleted line, Shift + Enter, "/al", Tab,
+ *        " ZQLE": not the lines "ZQL1" and "α ZQLE" in the list
+ *   TE2n a "2" selected, Control + the numeric keypad's + and Control +
+ *        Shift + it: a keydown cancelled, or the text changed (R1-F3)
+ *   TE4b a 1440 × 600 window, " /" at the end of the lowest text block, ↑:
+ *        the menu or its highlighted entry drawn outside the window (R1-F5)
+ *   TE4m " /a" typed at the start of a two-line block, Shift + ↓: the menu
+ *        still open over the selection it made, or Tab then inserting a
+ *        symbol (R1-F6)
+ *
  * INFORMATION (printed, not counted)
  *   H1   the first save held 12 s, " ZQH1", " ZQH2", ⌘S: when ZQH2 is sent,
  *        what the pill and ⌘S say meanwhile, whether ZQH2 is kept (review
@@ -153,6 +221,22 @@
  *   H8   Layout › Poster name emptied, Enter: the stored title before and
  *        after, what the field and its button show (older than fix 27; round
  *        3 of the restarted review measured it in Chromium)
+ *   TE-I-type-after-sub  " ZQCO<sub>2</sub>" pasted, End, " ZQNEXT": whether
+ *        the typed word goes into the subscript (record 39 §10)
+ *   TE-I-engine-commands  the engines' own superscript / subscript commands
+ *        run from the page on a selected "2", as is and with the page's base
+ *        rule for sub and sup overridden: the states they read and whether a
+ *        second press removes (record 39's cause)
+ *   TE-I-zoom  the page's zoom before and after the browser's own zoom key
+ *        outside text and Control + Shift + = in text (whether Playwright's
+ *        keys reach the browser's zoom at all)
+ *   TE-I-insert-variants  in a scratch contenteditable holding
+ *        <div>ZQV1</div><div>ZQV2<br>/al</div>: execCommand insertText over
+ *        the "/al" text (what the editor did), and three other ways to put
+ *        α there: which keep the <br> (the cause of TE4jb in Firefox)
+ *   TE-I-layouts  keydowns dispatched as German and French layouts send
+ *        them, with Ctrl, on a selected "2": which the editor takes, and as
+ *        what (record 39's review round 1, R1-F4; untrusted events)
  *
  * CONTROLS (exit 2 if one fails)
  *   C1   the backend works: " ZQOK" is stored within 3 s and the pill says
@@ -186,6 +270,13 @@
  *     Enter is not driven (fix 12's undo-history-check drives composition).
  *   - H5's paste is a paste event carrying plain text (the system clipboard
  *     is not touched); the browser's own ⌘V is not driven.
+ *   - Record 39's keys are Playwright's, delivered to the page: whether a
+ *     real browser's own zoom (Ctrl + = in Windows browsers) acts before the
+ *     page can cancel it is not seen (TE-I-zoom: Playwright's ⌘ + = zooms
+ *     nothing); Windows is told to the page (TE2w), not run. The format bar
+ *     is pressed with the mouse only. WebKit's ⌘C / ⌘V use the macOS
+ *     pasteboard, shared with other runs on the machine (TE3c, TE3sc, the
+ *     pastes): run WebKit alone, and again when a reading looks wrong.
  *
  * RUN (from apps/web; apps/web/.env points at the fake backend)
  *   node scripts/keep-work-check.mjs [--only id,id] [--json file]
@@ -207,6 +298,7 @@ import { ENTER } from './lib/keepWorkEnter.mjs';
 import { SAVE } from './lib/keepWorkSave.mjs';
 import { ELSEWHERE } from './lib/keepWorkElsewhere.mjs';
 import { LIMITS } from './lib/keepWorkLimits.mjs';
+import { TEXT_EDIT } from './lib/keepWorkTextEdit.mjs';
 
 const PORT = Number(process.env.PORT ?? 5820);
 const argVal = (name) => {
@@ -216,7 +308,7 @@ const argVal = (name) => {
 };
 const ONLY = argVal('--only')?.split(',') ?? null;
 const JSON_OUT = argVal('--json');
-const SCENARIOS = [...SAVE.filter((s) => s.control), ...ENTER, ...SAVE.filter((s) => !s.control), ...ELSEWHERE, ...LIMITS];
+const SCENARIOS = [...SAVE.filter((s) => s.control), ...ENTER, ...SAVE.filter((s) => !s.control), ...ELSEWHERE, ...LIMITS, ...TEXT_EDIT];
 /** Scenarios allowed to make a version (K7): they press ⌘S, Save version or Restore (K9, K10 and K11 press none). */
 const MAKES_VERSIONS = /^(K[1-8]-|H1-|H4-|H6-|H7-)/;
 
