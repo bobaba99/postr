@@ -253,11 +253,10 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
   // The file last put into this block (record 34): drawn while it is
   // stored (`src` undefined), then for as long as the block holds what it
   // was stored as. Never stored itself: the poster only ever holds the
-  // stored image. Uploads overwrite the file at {block}.{ext}, so a new
-  // file of the same type has the same imageSrc as the one it replaces,
-  // whose signed address the browser may already have drawn and cached
-  // (bounded-designs §3.3 D, the next fix's); the preview shows the new
-  // one meanwhile.
+  // stored image. Since record 35 every upload has a new file name, so the
+  // stored image never has the path of the one it replaces (before, a file
+  // of the same type overwrote {block}.{ext}, whose signed address the
+  // browser may already have drawn and cached; bounded-designs §3.3 D).
   const [preview, setPreview] = useState<{ url: string; src: string | undefined } | null>(null);
   useEffect(() => {
     const url = preview?.url;

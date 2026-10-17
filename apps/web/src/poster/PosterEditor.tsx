@@ -49,7 +49,11 @@ import { onHistoryButtons, runHistory, type HistoryDirection, type HistoryRunOpt
 import { useEditorHistory } from './useEditorHistory';
 import { usePrintShortcut } from './usePrintShortcut';
 import { useCanvasPaste } from './useCanvasPaste';
+import { emptyOnPoster, settleCopiedFiles, useBlockClipboard } from './useBlockClipboard';
+import { imagesLostMessage } from './blockClipboard';
+import { atPreDragGeometry } from './dragStep';
 import { insertSize } from './canvasPaste';
+import { copyPosterImage, heldAfterCopy, isStoragePath } from '@/data/posterImages';
 import { checkBounds, checkCollisions, type OobWarning } from './boundsCheck';
 import { GuidelinesPanel } from './GuidelinesPanel';
 import { OnboardingTour } from '@/components/OnboardingTour';
@@ -521,8 +525,11 @@ function useBlockDrag(
         // Cmd+Z restores where the block was before the drag.
         if (s?.active && preDragBlocksRef.current) {
           // Temporarily restore pre-drag blocks so withUndo snapshots
-          // them, then apply the current (post-drag) blocks.
-          setBlocksSilent(preDragBlocksRef.current);
+          // them, then apply the current (post-drag) blocks. The snapshot
+          // is the blocks as they are now at their pre-drag geometry
+          // (`atPreDragGeometry`), so a change made silently during the
+          // drag is not undone with it (record 35, R3-3).
+          setBlocksSilent(atPreDragGeometry(blocksRef.current, preDragBlocksRef.current));
           setBlocks(blocksRef.current);
         }
         preDragBlocksRef.current = null;
@@ -1783,6 +1790,23 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // above AND by the right-click "Duplicate" entry on non-table
   // block context menus. Title and authors are pinned header
   // blocks — silently refuse to clone them.
+  //
+  // An image or logo holding a stored file gets its OWN copy of that file
+  // (record 35, bounded-designs §3.3 D): the clone used to share the
+  // original's path, so a Replace on the original overwrote the clone's
+  // picture (MEASURED, docs/fixes/35-block-copy.md §4). The clone is added at
+  // once, in one undo step, holding its original's file: since record 35
+  // nothing overwrites or deletes a stored file, so sharing is safe (a
+  // Replace on either writes a new file). Its own file, a storage copy (one
+  // try), takes that file's place silently once made, while the clone still
+  // holds it (`settleCopiedFiles`); a copy that cannot be made (storage
+  // unreachable, a refusal not about the file) leaves it its original's file
+  // (review round 1, R1-3), and only a file storage says is not there
+  // empties it, with the paste's toast (`heldAfterCopy`: one rule with ⌘V,
+  // the lead's on the final check's F35-FC-2, correction 5). Waiting for the
+  // copy before adding the clone let a ⌘Z pressed meanwhile undo the step
+  // before, and stacked a second ⌘D's clone on the first (review round 2,
+  // R2-1).
   const duplicateBlock = (id: string) => {
     const src = doc.blocks.find((b) => b.id === id);
     if (!src) return;
@@ -1800,6 +1824,16 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       () => setJustInsertedId((curr) => (curr === clone.id ? null : curr)),
       700,
     );
+    if ((src.type === 'image' || src.type === 'logo') && isStoragePath(src.imageSrc)) {
+      const poster = posterId;
+      const from = src.imageSrc;
+      void copyPosterImage(from!, userId, poster, clone.id, { attempts: 1 }).then((copied) => {
+        const to = heldAfterCopy(from, copied);
+        if (to === from) return;
+        settleCopiedFiles(poster, [{ id: clone.id, from, to }]);
+        if (!to && emptyOnPoster(poster, new Set([clone.id]))) showToast(imagesLostMessage(1));
+      });
+    }
   };
 
   // Re-order a block by moving it N positions in the doc.blocks
@@ -1905,6 +1939,29 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     setJustInsertedId(first);
     setTimeout(() => setJustInsertedId((id) => (id === first ? null : id)), 700);
   };
+  // Copy, cut and paste blocks (record 35, useBlockClipboard.ts). A cut
+  // deletes as Delete does: the credit mark stays, with Delete's toast.
+  const cutBlocks = (ids: string[]): string | null => {
+    const latest = usePosterStore.getState().doc;
+    if (!latest) return null;
+    const outcome = filterDeletable(latest.blocks, ids);
+    if (outcome.removedIds.length > 0) {
+      setBlocks(outcome.blocks);
+      clearSelection();
+    }
+    return outcome.refusalMessage;
+  };
+  const blockClipboard = useBlockClipboard({
+    enabled: !readOnly && !previewMode && sidebarTab !== 'comments',
+    dialogOpen: modalDialogOpen,
+    selectedIds,
+    sheet: { w: cW, h: cH },
+    userId,
+    posterId,
+    commit: commitPastedBlocks,
+    remove: cutBlocks,
+    toast: showToast,
+  });
   const canvasPaste = useCanvasPaste({
     enabled: !readOnly && !previewMode && sidebarTab !== 'comments',
     dialogOpen: modalDialogOpen,
@@ -1915,6 +1972,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     userId,
     posterId,
     commit: commitPastedBlocks,
+    pasteBlocks: (payload) => void blockClipboard.pasteBlocks(payload),
   });
 
   const addBlock = (type: Block['type']) => {
