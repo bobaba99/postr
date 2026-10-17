@@ -918,7 +918,10 @@ the remaining items re-ranked by their effect on a first visitor
 - **A ring after a mouse click.** Once D draws the house ring, a mouse user
   who clicked a chrome button (Zoom in, FIT, a rail tab) and then presses an
   arrow key or Shift sees a ring on that button: Chromium's `:focus-visible`
-  rule (6 of 7 cases; 0 on main, where no ring drew at all).
+  rule (6 of 7 cases; 0 on main, where no ring drew at all). Kept by the
+  owner as plan item 20 and fixed there: `docs/fixes/20-focus-ring.md`
+  (re-measured on main: every key but Tab and ⌘Z, 274 of 294 button cases
+  in Chromium, record 20 §4).
 - **A 0 px canvas.** At 800 × 600 with both panels open the canvas has no
   width; the readout shows 0–1% (a fit left from the panel's slide) where
   main showed 100%. Nothing is visible either way.

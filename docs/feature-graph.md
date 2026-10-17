@@ -296,7 +296,7 @@ Root bootstrap, the route table, the dev-only debug page, and the 404 catch-all.
 
 ```mermaid
 flowchart LR
-  main["main.tsx"] -->|"installConsoleCapture + render"| App["App.tsx"]
+  main["main.tsx"] -->|"installConsoleCapture + installInputModality + render"| App["App.tsx"]
   App -->|"mounts :18"| Routes["AppRoutes (routes.tsx)"]
   App -->|"mounts :19"| FB["FeedbackModal"]
   App -->|"mounts :20"| PF["PublishFlow (dead — flag off)"]
@@ -317,8 +317,9 @@ No elements, copy, or graphics of its own. Mount sites only:
 #### `main.tsx` — React root bootstrap
 
 No UI — logic only.
-- [ ] Installs `installConsoleCapture()` — `main.tsx:9`
-- [ ] Renders `<App />` in StrictMode — `main.tsx:14-18`
+- [ ] Installs `installConsoleCapture()` — `main.tsx:10`
+- [ ] Installs `installInputModality()` before anything renders — `main.tsx:14` (`lib/inputModality.ts`: the house focus ring for keyboard navigation only; plan item 20, record 20)
+- [ ] Renders `<App />` in StrictMode — `main.tsx:21-25`
 
 #### `routes.tsx` — route table + lazy-load fallback
 
@@ -1291,7 +1292,7 @@ flowchart LR
 - [ ] `Show sidebar` / title `Show sidebar (⌘/)` — reveal-tab button (sidebar closed, desktop) — `PosterEditor.tsx:2742-2782` — opens sidebar; fixed 16 px from the left, centred in the editor's top bar (top 4 px; 16 px for a read-only viewer, who has no bar; fix 12 merge review F2)
 - [ ] canvas rubber-band — pointer drag on workspace — `PosterEditor.tsx:2568-2635` — marquee multi-select (click = deselect)
 - [ ] pinch / `Ctrl`+wheel — gesture — listener `PosterEditor.tsx:1350` — cursor-anchored zoom, 10× ceiling; the floor is min(0.2, the fit, the current zoom), so a pinch does not zoom the wrong way (one exception handed on: a pinch during the guidelines panel's 280 ms slide, record 03 section 10) (`clampZoom`, `workspaceGeometry.ts`; fix 03)
-- [ ] keyboard focus ring — `button:focus-visible` in `index.css` sets the outline `!important`, so it draws on buttons styled with an inline `all: 'unset'`; buttons marked `data-focus-inset` (guidelines section headers and Save as…, the author ▲ ▼ ×, Post comment) and the sidebar tabs draw it inset (−2 px) so it is not clipped or drawn over a neighbour (fix 03, cause D)
+- [ ] keyboard focus ring — `button:focus-visible` in `index.css` sets the outline `!important`, so it draws on buttons styled with an inline `all: 'unset'`; buttons marked `data-focus-inset` (guidelines section headers and Save as…, the author ▲ ▼ ×, Post comment) and the sidebar tabs draw it inset (−2 px) so it is not clipped or drawn over a neighbour (fix 03, cause D). Keyboard navigation only (plan item 20, record 20): the rule is gated on `<html data-postr-input-modality>` (`lib/inputModality.ts`), so after a mouse press no key but Tab draws it, not even Enter or Esc when the page then moves the focus (a dialog opening or closing; review round 1, R20-2) (Chromium's `:focus-visible` turned on after any key but ⌘, Ctrl and Alt, alone or in a chord: 274 of 294 click-then-key button cases on main, 0 after); in pointer mode the browser's own ring is off too, on buttons, links, checkboxes and `<summary>` disclosures (the Edit tab's table tips, the sign-up page's email preferences, the pricing page's "What's included"; R20-1); before any input the ring follows the browser
 - [ ] two-finger scroll — native pan via overflow:auto — `PosterEditor.tsx:1121-1123` (comment), container `:2721-2722`
 - [ ] `Zoom out` (`−`) — ZoomBar button — `PosterEditor.tsx:3616` — `stepTo(zoom - 0.15)`: clamped by `clampZoom` (floor min(0.2, the fit, the current zoom), the same as the pinch; a zoom within 1e-9 of the fit is the fit; a step that cannot move keeps the poster fitted)
 - [ ] `Reset zoom to fit` (`{percent}%` readout) — ZoomBar button — `PosterEditor.tsx:3623` — `fitToScreen()`
@@ -4819,11 +4820,16 @@ Consumers of `postJson`/`ApiError`: `data/billing.ts`, `manuscript/condenseClien
 
 #### `lib/consoleCapture.ts` — 200-entry in-memory console ring buffer for the Send-Feedback payload
 
-`installConsoleCapture()` called once at boot, `main.tsx:9`. `getCapturedLog()` callers: `components/ImportPosterModal.tsx:140`, `components/CopyDesignModal.tsx:148` (both attach to feedback context). **`getCapturedCount()` (`:89`) has NO callers — dead export** (doc claims "used by the modal preview" but nothing imports it — §10).
+`installConsoleCapture()` called once at boot, `main.tsx:10`. `getCapturedLog()` callers: `components/ImportPosterModal.tsx:140`, `components/CopyDesignModal.tsx:148` (both attach to feedback context). **`getCapturedCount()` (`:89`) has NO callers — dead export** (doc claims "used by the modal preview" but nothing imports it — §10).
 **Elements** — none.
 **Copy**
 - [ ] "[{ISO-ts}] [{LEVEL}] {message}" — captured-log line format (previewed in FeedbackModal before send) — `consoleCapture.ts:83`
 **Graphics** — none.
+
+#### `lib/inputModality.ts` — pointer or keyboard, on `<html data-postr-input-modality>` (plan item 20, record 20)
+
+`installInputModality()` called once at boot, `main.tsx:14`, before React renders, so its two window listeners (capture phase) run before the page's own: a dialog (`ConfirmModal`) stops every key in the window's capture phase, and the block controls stop the pointer's propagation. A pointer press (mouse, pen, touch) sets `pointer`; Tab with any modifier (Safari reaches buttons with Option+Tab) sets `keyboard`; any other key changes nothing, even when the page then moves the focus (Esc giving it back to a dialog's opener, Enter opening one: the plan's rule; the first build counted those as keyboard, review round 1, R20-2). Absent before any input. `index.css` reads it: the house ring (`button` / `[role="button"]` `:focus-visible`) is drawn unless the page is in pointer mode, and in pointer mode the browser's own ring is off on buttons, `[role="button"]`, links (`a[href]`), checkboxes and `<summary>`. Text fields and menus keep their own focus styles. `INPUT_MODALITY_ATTR`, `installInputModality(win)` (returns an uninstall, for tests). Tests: `lib/__tests__/inputModality.test.ts`; browser: `scripts/fit-check.mjs` focus-* (`lib/focusRingScenarios.mjs`).
+**Elements** — none. **Copy** — none. **Graphics** — none.
 
 #### `lib/supabase.ts` — singleton Supabase browser client (persistSession, autoRefreshToken, detectSessionInUrl)
 
@@ -4990,6 +4996,7 @@ No UI — logic only. `globalPrivacyControlOn()` is true only when `navigator.gl
 | `lib/auth` (`ensureSession`) | AuthBootstrap (dead), data/posters, manuscript/condenseClient, pages/Share |
 | `lib/supabase` | 28 files (all data/*, auth components, import modules, pages, usePlan, useAutosave) |
 | `lib/consoleCapture` | main.tsx (install); `getCapturedLog` from ImportPosterModal, CopyDesignModal |
+| `lib/inputModality` | main.tsx (install); read by `index.css` through `html[data-postr-input-modality]` (record 20) |
 | `config/features` (`GALLERY_PUBLIC_ENABLED`) | Profile, Home, HistoryRows, PosterEditor, Sidebar, OnboardingTour |
 | `config/features` (`SHARING_ENABLED`, fix 23) | routes, Sidebar, FloatingFormatToolbar, PosterEditor |
 | `config/features` (`RULERS_ENABLED`) | PosterEditor, Sidebar |

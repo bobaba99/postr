@@ -282,7 +282,7 @@ findings; none was measured in this pass.
 | C-18 | Tour: step 1's tooltip leaves the window with the sidebar collapsed; leaving mid-tour restarts at 1/8; step 2's tooltip runs off a 600 px window | LOW | onboarding tour | Rec: the reviewers' (record 03 §10 R7) |
 | C-19 | Table: forward Tab sticks in the last cell (120 Tabs from load end there), so the controls after the table, Undo/Redo included, are not reached by Tab | LOW-MEDIUM (a11y) | tables | Rec: MEASURED (records 03, 12). INSPECTED here: `blocks.tsx:627` `onCellKeyDown` |
 | C-20 | The table cell's HTML is stored unsanitized | LOW while sharing is hidden | tables | Rec: INSPECTED (record 12 §10) |
-| C-21 | Item 20: a toolbar button shows a focus ring after a mouse click then a key (Chromium, 6 of 7) | LOW ("annoyance", plan) | chrome polish | Rec: MEASURED (record 03 §10) |
+| C-21 | Item 20: a toolbar button shows a focus ring after a mouse click then a key (Chromium, 6 of 7); **fixed by record 20** (`docs/fixes/20-focus-ring.md`, branch `fix/20-focus-ring`, 2026-10-17: re-measured on main, 274 of 294 click-then-key button cases in Chromium, and the browser's own ring on links, checkboxes and `<summary>`; 0 after in Chromium, Firefox and WebKit, keyboard rings kept; MEASURED, `fit-check.mjs --only 'focus-*'`) | LOW ("annoyance", plan) | chrome polish | Rec: MEASURED (record 03 §10) |
 
 ---
 
