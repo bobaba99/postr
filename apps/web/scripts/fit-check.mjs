@@ -21,11 +21,14 @@
  *       the sheet hidden (plain, and with a block parked off the sheet)
  *   H6  a canvas narrower than the gutter (a 860–900 px window with both
  *       panels open) shows the poster at 100%, or hides part of it
- *   Hr  regression guard: on the axis the sheet fills, the rulers' 0-inch
- *       mark is not the 24 px off it was on main (the ruler bar's inset,
- *       plan item 4). Update this guard when item 4 fixes the rulers. While
- *       the rulers are hidden (RULERS_ENABLED) it measures nothing, and the
- *       run prints that instead of the claim.
+ *   Hr  regression guard: after Fit, both rulers' 0-inch marks sit on the
+ *       sheet's top-left corner, within 0.5 px plus layout's 1/64 px unit
+ *       (the rulers' ticks sit on whole device pixels; fixed by plan item 4,
+ *       docs/fixes/04-rulers-match-sheet.md; every mark is checked by
+ *       scripts/ruler-check.mjs). No 0-inch mark after Fit is a regression
+ *       too. On a tree whose src/config/features.ts sets RULERS_ENABLED =
+ *       false it measures nothing, and the run prints that instead of the
+ *       claim.
  *   H4k with the guidelines panel closed (clipped to zero width, not
  *       removed), the keyboard still reaches controls inside it: focus
  *       lands on something nobody can see. The same for the sidebar is
@@ -60,8 +63,9 @@
  *       the 24 px top ruler after Fit. Until fix 19 the row was drawn in
  *       the sheet's units, 24 × zoom px above its block; since fix 19
  *       (docs/fixes/19-controls-one-size.md) it starts 38 px above the
- *       block at every zoom, inside the 64 px gutter. The rulers are
- *       hidden (RULERS_ENABLED); item 4 re-measures this when they return.
+ *       block at every zoom, inside the 64 px gutter. Since item 4 showed
+ *       the rulers again (docs/fixes/04-rulers-match-sheet.md) the row is
+ *       measured with them drawn.
  *   Control: the phone share view (its gutter matches its padding) hides
  *   nothing. Skipped (printed as [skipped], not counted, never an error)
  *   on a tree that hides sharing, read at run time: the share link
@@ -138,8 +142,7 @@ async function measure(page) {
     const hidden = Object.fromEntries(Object.entries(gutter).map(([k, v]) => [k, round(Math.max(0, -v))]));
     const sheetUnitsW = Number(sheet.style.width.replace('px', ''));
     // The rulers' 0-inch marks against the sheet's top-left corner: 0 when
-    // the rulers are right (plan item 4 fixes the rest; this fix must not
-    // make them worse).
+    // the rulers are right (plan item 4).
     const zeros = [...document.querySelectorAll('span')].filter((sp) => sp.textContent === '0"');
     const topZero = zeros.find((sp) => sp.style.writingMode !== 'vertical-lr');
     const leftZero = zeros.find((sp) => sp.style.writingMode === 'vertical-lr');
@@ -213,7 +216,11 @@ function fitScenario(vw, vh, pw, ph, guidelines, dpr = 1) {
         const scrolls = Math.max(afterFit.overflow.x, afterFit.overflow.y) > 0;
         return {
           observed: afterFit.hiddenMax > 0.5 || onOpen.hiddenMax > 0.5 || scrolls,
-          rulerRegressed: rulerFilled !== null && Math.abs(rulerFilled - 24) > 0.5,
+          // No 0-inch marks after Fit (rulerError null) is a regression too
+          // where the rulers are shown (counted below). Half a pixel plus
+          // layout's 1/64 px unit: the rulers' ticks sit on whole device
+          // pixels (fix 04, the second step 10 review, R3-F1).
+          rulerRegressed: rulerFilled === null || Math.max(Math.abs(rulerFilled), Math.abs(rulerOther)) > 0.5 + 1 / 64,
           mechanism: afterFit.overflow[limiting] === 132,
           scrolls,
           rulerFilled, rulerOther,
@@ -1159,14 +1166,15 @@ for (const r of results.filter((x) => x.claim)) {
 }
 const mech = results.filter((r) => r.claim === 'H1');
 // The ruler guard counts as its own claim, so a regression fails the run.
-const rulerRuns = mech.filter((r) => typeof r.rulerFilled === 'number');
-if (rulerRuns.length) {
+// Where the tree shows the rulers, a fit with no 0" mark counts against it.
+const rulersShown = sourceFlag('RULERS_ENABLED') !== false;
+const rulerRuns = mech.filter((r) => 'rulerRegressed' in r);
+if (rulersShown && rulerRuns.length) {
   byClaim.Hr = { observed: rulerRuns.filter((r) => r.rulerRegressed).length, of: rulerRuns.length };
 } else if (mech.length) {
-  // No ruler drew a 0" mark: the rulers are hidden (RULERS_ENABLED,
-  // config/features.ts, 2026-09-30), so the guard measures nothing. Say so
-  // rather than let it pass in silence.
-  log('[INFO] Hr not measured: no ruler drew a 0" mark (the rulers are hidden)');
+  // The tree hides the rulers (RULERS_ENABLED = false, config/features.ts),
+  // so the guard measures nothing. Say so rather than let it pass in silence.
+  log('[INFO] Hr not measured: src/config/features.ts sets RULERS_ENABLED = false');
 }
 const summary = {
   git: h.git, mutant: h.mutant, claims: byClaim,
