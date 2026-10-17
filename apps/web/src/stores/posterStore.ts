@@ -548,13 +548,19 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
   // back, whatever removed it. Locked blocks PRESENT in `blocks` pass
   // through untouched, which is what keeps them movable and
   // resizable while still undeletable.
+  //
+  // Not an edit: a list that changes nothing adds no step, as in
+  // updateBlock, patchDoc and removeBlock (fix 12, U10: an empty step
+  // wipes the redo, and the next ⌘Z shows nothing). A drag that ends
+  // where it started and an arrow pressed at the sheet's edge used to
+  // add one (record 36's review, R36-1).
   setBlocks: (blocks) =>
-    set((state) =>
-      withUndo(state, (doc) => ({
-        ...doc,
-        blocks: guardLocked(doc.blocks, blocks),
-      })),
-    ),
+    set((state) => {
+      if (!state.doc) return {};
+      const next = guardLocked(state.doc.blocks, blocks);
+      if (sameValue(next, state.doc.blocks)) return {};
+      return withUndo(state, (doc) => ({ ...doc, blocks: next }));
+    }),
 
   /** Set blocks WITHOUT pushing to undo — used for drag intermediates. */
   setBlocksSilent: (blocks: Block[]) =>

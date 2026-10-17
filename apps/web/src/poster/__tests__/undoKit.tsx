@@ -36,6 +36,7 @@ import { fireEvent } from '@testing-library/react';
 import type { Block, PosterDoc } from '@postr/shared';
 import { makeDoc, nextTask } from './editorKit';
 import { usePosterStore } from '@/stores/posterStore';
+import { MAC } from '../selectionKeys';
 
 export { NAME, NoopResizeObserver, doc, load, nextTask, openTab, q, renderEditor } from './editorKit';
 
@@ -600,6 +601,8 @@ export const selectedBlocks = () =>
   [...new Set(Array.from(document.querySelectorAll('[data-postr-selected="true"]')).map((e) => e.getAttribute('data-block-id')))];
 
 export const KEYS = {
+  /** The fine nudge, 0.1 in: ⌘ + arrow on a Mac, Ctrl + arrow elsewhere (record 36; Shift + arrow before it). */
+  fineRight: { key: 'ArrowRight', code: 'ArrowRight', ...(MAC ? { metaKey: true } : { ctrlKey: true }) },
   undo: { key: 'z', code: 'KeyZ', metaKey: true },
   redo: { key: 'z', code: 'KeyZ', metaKey: true, shiftKey: true },
   redoUpper: { key: 'Z', code: 'KeyZ', metaKey: true, shiftKey: true },

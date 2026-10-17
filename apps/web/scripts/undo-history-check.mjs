@@ -173,7 +173,56 @@
  *        scrolled sideways, the group outside the window or under the notice,
  *        a button not the top element at its centre, or the sidebar's Show
  *        button (hidden sidebar) over the workspace
+ *   From record 36, select and move like PowerPoint (lib/selectMoveScenarios.mjs;
+ *   bounded-designs §3.4; `--only SM` runs these alone):
+ *   K0   the references block selected, a click on the Style tab's font menu
+ *        (the focus on a SELECT), then Backspace, Delete, ArrowRight, ⌘D, ⌘A
+ *        or Esc there (each on a new page): a block removed, moved, copied,
+ *        selected or deselected (OF-11)
+ *   K0t  the table's first two cells selected by dragging, the font menu
+ *        clicked, Backspace then Delete on it: the table removed or a cell
+ *        of the range emptied (the table's own range listener, the same
+ *        guard); a cell edited without being emptied is the engine's own
+ *        forward Delete (Playwright's WebKit, U-10's family), `engineEdit`
+ *   K1   the caret in text block 1, Esc: the caret still in the text, or the
+ *        block not the selection, or its text changed; then Delete does not
+ *        remove the block
+ *   K1c  the same from the table's first cell
+ *   K1d  one block selected by its frame, Esc: still selected; two (Shift +
+ *        click), Esc: still selected
+ *   K1s  " /al" typed (the slash menu opens), Esc: the menu still open, or the
+ *        caret out of the text, or the block deselected
+ *   K1m  a block selected, Layout › 3-Column Classic (its dialog), Esc: the
+ *        dialog still open, the block deselected, or a block changed
+ *   K2   on a poster with the locked credit mark: ⌘A with nothing selected
+ *        and with one block selected does not select exactly every block but
+ *        the mark
+ *   K2t  the caret in text block 1, ⌘A: blocks selected, or the text not
+ *        all selected, or the caret gone
+ *   K3   ArrowRight / ArrowDown on a selected image: not 0.5 in each, drawn
+ *        on the sheet and stored
+ *   K3f  the fine nudge (⌘ + arrow on a Mac host, Ctrl + arrow elsewhere,
+ *        PowerPoint's key on the platform): not 0.1 in
+ *   K3x  Shift, Alt, Shift + the fine key, Alt + the fine key, or the other
+ *        platform's key with ArrowRight / ArrowDown: the image moves
+ *   K4m  two blocks selected, the group frame dragged: one ⌘Z does not put
+ *        both back exactly (stored, and drawn within 0.005 in), or one ⌘⇧Z
+ *        does not re-apply the drag (OF-06)
+ *   K4r  the same for a drag of the group's se handle (widths and heights)
+ *   K4j  a drag that changes nothing (out and back to where it was pressed,
+ *        and a 6 px drag after 16 Zoom in clicks, under half a grid step),
+ *        of the group and of the image by its move handle, after a real
+ *        drag: a block changed, or one ⌘Z does not put every block back to
+ *        before the real drag (an empty step: review round 1, R36-1)
+ *   K3e  the image pressed left to the sheet's edge and once more: one
+ *        ⌘Z does not put it back where the last real move started
  *   INFORMATION, not counted:
+ *   SM-I-escape-block-menu  a right-click on the image, Esc: whether its
+ *        block menu closes and the image stays selected
+ *   SM-I-arrow-chords-leave  a block selected, Alt + ← and the other
+ *        platform's key + ←: whether the page leaves the editor and the app
+ *        cancels the key; a nudge then that key, or history.back(): whether
+ *        the nudge was saved (R36-2)
  *   U10p U10 on text stored with <p> wrappers (the first commit unwraps them)
  *   P1   whether highlight (an allowed style) reaches the store after a
  *        later keystroke ("kept" observed = it is missing)
@@ -270,6 +319,7 @@ import { COMPOSE } from './lib/undoScenariosCompose.mjs';
 import { BUTTON_KEYS } from './lib/undoScenariosButtonKeys.mjs';
 import { DRAGS } from './lib/undoScenariosDrags.mjs';
 import { PLACEMENT } from './lib/undoScenariosPlacement.mjs';
+import { SELECT_MOVE } from './lib/selectMoveScenarios.mjs';
 
 const PORT = Number(process.env.PORT ?? 5880);
 const argVal = (name) => {
@@ -285,7 +335,7 @@ const fail = (e) => {
 };
 const VIEWPORT = { width: 1440, height: 900 };
 const POSTER = { w: 48, h: 36 };
-const SCENARIOS = [...CORE, ...ENTRIES, ...SIGNALS, ...COMPOSE, ...BUTTON_KEYS, ...DRAGS, ...PLACEMENT];
+const SCENARIOS = [...CORE, ...ENTRIES, ...SIGNALS, ...COMPOSE, ...BUTTON_KEYS, ...DRAGS, ...PLACEMENT, ...SELECT_MOVE];
 
 /** C3: the engine's own undo on a bare page, no app code. */
 async function bareControl(h) {

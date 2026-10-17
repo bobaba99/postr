@@ -33,6 +33,7 @@ import { TableCellEditor } from './TableCellEditor';
 import { DEFAULT_PROMPTS, tablePromptFor } from './startingText';
 import { ADJUSTMENTS_ENABLED } from '@/config/features';
 import { onHistoryButtons } from './editorHistory';
+import { isEditing } from './canvasPaste';
 import {
   DEFAULT_TABLE_DATA,
   deleteColAt,
@@ -690,10 +691,11 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
     if (selectedRow === null && selectedCol === null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-      // Don't hijack keystrokes aimed at an editable element, or pressed
-      // on the Undo / Redo button (fix 12 review R3-F1).
+      // Don't hijack keystrokes aimed at a text field — a menu (SELECT)
+      // included, record 36's key rule — or pressed on the Undo / Redo
+      // button (fix 12 review R3-F1).
       const target = e.target as HTMLElement | null;
-      if (target?.isContentEditable || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+      if (isEditing(target)) return;
       if (onHistoryButtons(target)) return;
       e.preventDefault();
       if (selectedRow !== null && data.rows > 1) {
@@ -718,8 +720,10 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
     if (single) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      // Not from a text field, a menu (SELECT) included: record 36's key
+      // rule (Backspace on a focused menu cleared the cells).
       const target = e.target as HTMLElement | null;
-      if (target?.isContentEditable || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+      if (isEditing(target)) return;
       // Not from the Undo / Redo button either (fix 12 review R3-F1).
       if (onHistoryButtons(target)) return;
       e.preventDefault();
@@ -1374,6 +1378,9 @@ function TableContextMenu({ x, y, r, c, data, onAction, onClose }: {
   return (
     <div
       ref={menuRef}
+      // The menu closes on Esc (its own listener above), so Esc neither
+      // leaves the text nor deselects while it is open (record 36).
+      data-postr-takes-escape=""
       // Stop both click AND mousedown so the window-level close
       // listener below (which listens on mousedown to dodge
       // stopPropagation on button clicks elsewhere in the tree)
@@ -2782,6 +2789,10 @@ export function BlockFrame(props: BlockFrameProps) {
       {blockMenu &&
         ReactDOM.createPortal(
           <div
+            // While the menu is open Esc neither deselects nor leaves text
+            // (record 36). The menu has no Esc of its own yet: the block
+            // menu's own fix.
+            data-postr-takes-escape=""
             onClick={() => setBlockMenu(null)}
             onContextMenu={(e) => {
               e.preventDefault();

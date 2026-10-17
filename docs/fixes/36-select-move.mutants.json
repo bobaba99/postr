@@ -1,0 +1,360 @@
+{
+  "tests": [
+    "src/poster/__tests__/selectMove.test.tsx",
+    "src/poster/__tests__/selectMoveAdjustments.test.tsx",
+    "src/poster/__tests__/undoButtonKeys.test.tsx",
+    "src/poster/__tests__/canvasPasteEntry.test.tsx"
+  ],
+  "mutants": {
+    "editor-guard-without-select": {
+      "undoes": "K0 (OF-11) — the editor's key handler treats a focused menu (SELECT) as a text field: the guard as it was on main",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "if (isEditing(document.activeElement) || isEditing(e.target as Element | null)) return;",
+          "{ const t = document.activeElement as HTMLElement | null; if (t?.tagName === 'INPUT' || t?.tagName === 'TEXTAREA' || t?.getAttribute('contenteditable') === 'true') return; }"
+        ]
+      ]
+    },
+    "shared-test-without-select": {
+      "undoes": "K0 — the one edit-mode test (canvasPaste isEditing, shared by the keys, the table's listeners and paste) counts a SELECT",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "tag === 'TEXTAREA' || tag === 'SELECT' ||",
+          "tag === 'TEXTAREA' ||"
+        ]
+      ]
+    },
+    "table-range-guard-as-on-main": {
+      "undoes": "K0 (sibling) — the table's range-clear listener leaves a focused menu's Backspace to the menu",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      // rule (Backspace on a focused menu cleared the cells).\n      const target = e.target as HTMLElement | null;\n      if (isEditing(target)) return;",
+          "      // rule (Backspace on a focused menu cleared the cells).\n      const target = e.target as HTMLElement | null;\n      if (target?.isContentEditable || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;"
+        ]
+      ]
+    },
+    "table-strip-guard-as-on-main": {
+      "undoes": "K0 (sibling) — the table's row / column strip listener leaves a focused menu's Backspace to the menu. BLIND SPOT, unreachable today: a click or key press on any control outside the table clears the strip selection (blocks.tsx), and selecting the table shows the Edit block tab, which has no menu for a table; the strips are hidden while ADJUSTMENTS_ENABLED is off (record 29). Changed with the range listener so the three copies of the guard are one rule (INSPECTED).",
+      "expect": "survive",
+      "unguarded": "INSPECTED: no user path reaches the strip listener with a menu focused (a click or a key press on any control outside the table clears the strip selection, blocks.tsx; selecting the table shows the Edit block tab, which has no menu for a table; the strips are hidden while ADJUSTMENTS_ENABLED is off), so no browser scenario can enter it either",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      // button (fix 12 review R3-F1).\n      const target = e.target as HTMLElement | null;\n      if (isEditing(target)) return;",
+          "      // button (fix 12 review R3-F1).\n      const target = e.target as HTMLElement | null;\n      if (target?.isContentEditable || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;"
+        ]
+      ]
+    },
+    "no-select-all": {
+      "undoes": "K2 — ⌘A / Ctrl+A outside text selects every block",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        setSelectedIds(new Set(doc.blocks.filter((b) => !isLocked(b)).map((b) => b.id)));\n",
+          ""
+        ]
+      ]
+    },
+    "select-all-takes-the-mark": {
+      "undoes": "K2 — ⌘A leaves out the locked credit mark",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "new Set(doc.blocks.filter((b) => !isLocked(b)).map((b) => b.id))",
+          "new Set(doc.blocks.map((b) => b.id))"
+        ]
+      ]
+    },
+    "select-all-key-missing": {
+      "undoes": "K2 — the key: ⌘A and Ctrl+A are read as select-all",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "if (command && !e.altKey && !e.shiftKey && isLetterA(e)) return { kind: 'selectAll' };",
+          ""
+        ]
+      ]
+    },
+    "fine-nudge-is-shift": {
+      "undoes": "K3 — the fine nudge is ⌘/Ctrl + arrow, not Shift + arrow (as on main)",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "const fine = !e.altKey && !e.shiftKey && (mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey);",
+          "const fine = e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey;"
+        ]
+      ]
+    },
+    "fine-nudge-either-key": {
+      "undoes": "K3 — the fine key is the platform's own (⌘ on a Mac, Ctrl elsewhere); the other platform's key does nothing",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "(mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey)",
+          "(e.metaKey || e.ctrlKey)"
+        ]
+      ]
+    },
+    "fine-nudge-platforms-swapped": {
+      "undoes": "K3 — ⌘ on a Mac and Ctrl elsewhere, not the other way round",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "(mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey)",
+          "(!mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey)"
+        ]
+      ]
+    },
+    "other-modifiers-nudge": {
+      "undoes": "K3 — any other modifier with an arrow does nothing to blocks (on main Alt and ⌘/Ctrl moved ½ in)",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "const step = plain ? NUDGE : fine ? FINE_NUDGE : 0;",
+          "const step = fine ? FINE_NUDGE : NUDGE;"
+        ]
+      ]
+    },
+    "arrow-not-half-inch": {
+      "undoes": "K3 — a plain arrow moves one grid step, ½ in",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "export const NUDGE = SNAP_GRID;",
+          "export const NUDGE = 1;"
+        ]
+      ]
+    },
+    "escape-not-installed": {
+      "undoes": "K1 — Esc is installed in the editor",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "useSelectionEscape(!previewMode && sidebarTab !== 'comments', {",
+          "useSelectionEscape(false, {"
+        ]
+      ]
+    },
+    "escape-keeps-the-caret": {
+      "undoes": "K1 — Esc in text leaves the text",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "      host.blur();\n",
+          ""
+        ]
+      ]
+    },
+    "escape-in-text-is-a-field": {
+      "undoes": "K1 — editable text is left on Esc, not treated as a field that keeps the key",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "  if (focus instanceof HTMLElement && focus.isContentEditable) return 'leave-text';\n",
+          ""
+        ]
+      ]
+    },
+    "escape-leaves-other-block-selected": {
+      "undoes": "K1 — leaving the text selects the block it was in",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      if (blockId && !selectedIds.has(blockId)) selectOne(blockId);",
+          "      void blockId;"
+        ]
+      ]
+    },
+    "escape-deselects-from-a-menu": {
+      "undoes": "K0 — Esc on a focused field (a menu) does not deselect",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "  return isEditing(focus) ? 'field' : 'deselect';",
+          "  return 'deselect';"
+        ]
+      ]
+    },
+    "escape-does-not-deselect": {
+      "undoes": "K1 — Esc outside text deselects",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      if (selectedIds.size > 0) clearSelection();",
+          "      void selectedIds;"
+        ]
+      ]
+    },
+    "escape-ignores-dialogs": {
+      "undoes": "K1 — a dialog takes Esc first",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "  return dialogOpen() || root.querySelector(`[${TAKES_ESCAPE_ATTR}]`) !== null;",
+          "  return root.querySelector(`[${TAKES_ESCAPE_ATTR}]`) !== null;"
+        ]
+      ]
+    },
+    "escape-ignores-open-menus": {
+      "undoes": "K1 — an element marked data-postr-takes-escape (the slash menu, the block and table menus, crop) takes Esc first",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "  return dialogOpen() || root.querySelector(`[${TAKES_ESCAPE_ATTR}]`) !== null;",
+          "  return dialogOpen();"
+        ]
+      ]
+    },
+    "slash-menu-unmarked": {
+      "undoes": "K1 — the slash menu is marked as taking Esc",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "            data-postr-takes-escape=\"\"\n",
+          ""
+        ]
+      ]
+    },
+    "block-menu-unmarked": {
+      "undoes": "K1 — the block menu is marked as taking Esc",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "            // menu's own fix.\n            data-postr-takes-escape=\"\"\n",
+          "            // menu's own fix.\n"
+        ]
+      ]
+    },
+    "table-menu-unmarked": {
+      "undoes": "K1 — the table's right-click menu is marked as taking Esc",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      // leaves the text nor deselects while it is open (record 36).\n      data-postr-takes-escape=\"\"\n",
+          "      // leaves the text nor deselects while it is open (record 36).\n"
+        ]
+      ]
+    },
+    "crop-unmarked": {
+      "undoes": "K1 — crop is marked as taking Esc",
+      "edits": [
+        [
+          "src/poster/CropOverlay.tsx",
+          "      data-postr-takes-escape=\"\"\n",
+          ""
+        ]
+      ]
+    },
+    "escape-during-composition": {
+      "undoes": "K1 — inside an input method's composition Esc is the composition's",
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "if (e.key !== 'Escape' || e.isComposing || e.keyCode === 229) return;",
+          "if (e.key !== 'Escape') return;"
+        ]
+      ]
+    },
+    "group-step-is-the-dragged-poster": {
+      "undoes": "K4 (OF-06) — a group drag's step puts the blocks back where the drag started before it commits",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    if (origin) storeSetBlocksSilent(atPreDragGeometry(dragged, origin));\n",
+          ""
+        ]
+      ]
+    },
+    "setblocks-pushes-unchanged": {
+      "undoes": "K4 / K3 (review round 1, R36-1) — a whole-list write that changes nothing adds no undo step: a drag that ends where it started (the group's and one block's) and an arrow pressed at the sheet's edge; the store's setBlocks as it was before the review",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      if (sameValue(next, state.doc.blocks)) return {};\n",
+          ""
+        ]
+      ]
+    },
+    "keys-dialog-test-aria-only": {
+      "undoes": "K0 (review round 1, R36-4) — the editor's Delete, arrows, ⌘D, ⌘A, ⌘/ and the canvas's paste wait behind a dialog that carries the shared modal markup but no aria-modal (the Staples dialog): modalDialogOpen as it was before the review, aria-modal dialogs only",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "function modalDialogOpen(): boolean {\n  return dialogOpen();\n}",
+          "function modalDialogOpen(): boolean {\n  return document.querySelector('[role=\"dialog\"][aria-modal=\"true\"]:not([data-state=\"closing\"])') !== null;\n}"
+        ]
+      ]
+    },
+    "keys-ignore-dialogs": {
+      "undoes": "K0 (review round 1, R36-4; open-findings U-11) — the selection's keys wait while a dialog is open: the guard removed from the editor's key handler (its mutant survived the whole suite before, U-11)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      if (modalDialogOpen()) return;\n      // Review mode: disallow destructive/structural keyboard actions\n",
+          "      // Review mode: disallow destructive/structural keyboard actions\n"
+        ]
+      ]
+    },
+    "escape-bubble-phase": {
+      "undoes": "K1 — Esc runs in the capture phase, before what is open handles the key and closes (a browser commits React's state change in a microtask between listeners, so a later listener no longer sees the slash menu; record 02's round-7 audit met the same between two dialogs)",
+      "expect": "survive",
+      "why": "jsdom: testing-library's fireEvent runs inside act(), which commits React's updates only after the whole dispatch, so every listener still sees the menu",
+      "browser": {
+        "harness": "scripts/undo-history-check.mjs",
+        "scenarios": [
+          "SM-K1o-escape-open-things-first"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/selectionKeys.ts",
+          "    window.addEventListener('keydown', onKeyDown, true);\n    return () => window.removeEventListener('keydown', onKeyDown, true);",
+          "    window.addEventListener('keydown', onKeyDown);\n    return () => window.removeEventListener('keydown', onKeyDown);"
+        ]
+      ]
+    },
+    "arrow-chord-not-cancelled": {
+      "undoes": "R36-2 (the lead's decision at merge) — an arrow chord that is not a nudge, with a block selected, is left to the browser (Alt + ← goes Back)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      if (action.kind === 'arrowIgnored') {\n        e.preventDefault();\n        return;\n      }",
+          "      if (action.kind === 'arrowIgnored') {\n        return;\n      }"
+        ]
+      ]
+    },
+    "group-move-from-origin": {
+      "undoes": "the merge of records 35 and 36: each group move rebuilds the poster from the drag's start, so a change made during the drag is lost",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    const next = currentBlocks().map((blk) => {\n      const o = start.get(blk.id);\n      if (!selectedIds.has(blk.id) || !o) return blk;\n      return {\n        ...blk,\n        x: snap(Math.max(0, o.x + dx)),",
+          "    const next = groupDragOrigin.current.map((blk) => {\n      const o = blk;\n      if (!selectedIds.has(blk.id)) return blk;\n      return {\n        ...blk,\n        x: snap(Math.max(0, o.x + dx)),"
+        ]
+      ]
+    },
+    "group-resize-from-origin": {
+      "undoes": "the merge of records 35 and 36: each group resize step rebuilds the poster from the drag's start",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    const next = currentBlocks().map((blk) => {\n      const o = start.get(blk.id);\n      if (!selectedIds.has(blk.id) || !o) return blk;\n      const sx",
+          "    const next = origin.map((blk) => {\n      const o = blk;\n      if (!selectedIds.has(blk.id)) return blk;\n      const sx"
+        ]
+      ]
+    },
+    "group-end-snapshot-origin": {
+      "undoes": "the merge of records 35 and 36: the group drag's undo snapshot is the poster at the drag's start, so its undo reverts a change made during the drag",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    if (origin) storeSetBlocksSilent(atPreDragGeometry(dragged, origin));",
+          "    if (origin) storeSetBlocksSilent(origin);"
+        ]
+      ]
+    }
+  }
+}

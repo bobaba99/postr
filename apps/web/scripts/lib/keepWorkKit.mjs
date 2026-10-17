@@ -27,10 +27,13 @@ export const SAVE_KEY = `${MOD}+s`;
  * session token's lifetime in seconds (the fake backend's, 3600 by
  * default; H6 uses 30, a token the client refreshes before any request).
  * `tour` leaves the onboarding tour to start (record 29's simplify-check).
+ * `initScript` runs in every page before the app (record 39's TE2w tells
+ * the app it runs on Windows with it).
  */
-export async function openSignedIn(h, { plan = 'term', expiresIn = 3600, tour = false } = {}) {
+export async function openSignedIn(h, { plan = 'term', expiresIn = 3600, tour = false, initScript = null } = {}) {
   const state = newState({ anonymous: false, plan, expiresIn });
   const { context, page } = await newGuestPage(h, state, { tour });
+  if (initScript) await context.addInitScript(initScript);
   await context.addInitScript(() => {
     // The print window calls print() on a timer; nothing is printed here.
     window.print = () => {};

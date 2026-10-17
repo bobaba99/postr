@@ -46,7 +46,7 @@ const snapshot = (page) => page.evaluate(async () => {
  * of the app reads `defaultPrevented` (grep of apps/web/src), so what the
  * editor does with the key is unchanged. The URL is compared too.
  */
-const holdBackspaceNavigation = (page) => page.evaluate(() => {
+export const holdBackspaceNavigation = (page) => page.evaluate(() => {
   window.addEventListener('keydown', (e) => { if (e.key === 'Backspace' && !e.defaultPrevented) e.preventDefault(); });
   return location.href;
 });

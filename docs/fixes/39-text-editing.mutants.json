@@ -1,0 +1,412 @@
+{
+  "tests": [
+    "src/poster/__tests__/textEditing.test.tsx",
+    "src/poster/__tests__/scriptFormat.test.ts",
+    "src/poster/__tests__/slashCommand.test.ts",
+    "src/poster/__tests__/mvpHidden.test.tsx"
+  ],
+  "mutants": {
+    "no-script-buttons": {
+      "undoes": "T1 — the format bar has no x² and no x₂ (as on main)",
+      "edits": [
+        [
+          "src/poster/FloatingFormatToolbar.tsx",
+          "      {scriptButton('x²', 'sup', formats.superscript, onChange)}\n      {scriptButton('x₂', 'sub', formats.subscript, onChange)}\n",
+          ""
+        ]
+      ]
+    },
+    "always-on": {
+      "undoes": "T1 — x² pressed again on superscript text applies it again instead of removing it (the engines' own toggle in Chromium and WebKit, record 39 §4)",
+      "edits": [
+        [
+          "src/poster/scriptFormat.ts",
+          "  const turnOn = !scriptState(host, range, tag);",
+          "  const turnOn = true;"
+        ]
+      ]
+    },
+    "no-exclusion": {
+      "undoes": "T1 — x² and x₂ do not exclude each other: only the same kind is taken away first",
+      "edits": [
+        [
+          "src/poster/scriptFormat.ts",
+          "    for (let outer = outermostIn(t, SCRIPTS, host); outer; outer = outermostIn(t, SCRIPTS, host)) liftOut(t, outer);",
+          "    for (let outer = outermostIn(t, [tag.toUpperCase()], host); outer; outer = outermostIn(t, [tag.toUpperCase()], host)) liftOut(t, outer);"
+        ]
+      ]
+    },
+    "engine-state": {
+      "undoes": "T1 — the bar reads x² and x₂ state from the engine (queryCommandState), which the page's base style misreads in Chromium and WebKit",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    superscript: scriptState(el, range, 'sup'),\n    subscript: scriptState(el, range, 'sub'),",
+          "    superscript: document.queryCommandState('superscript'),\n    subscript: document.queryCommandState('subscript'),"
+        ]
+      ]
+    },
+    "no-state-after-input": {
+      "undoes": "T1 (sibling, TE1b) — the bar's state is read only on selectionchange: after a format button that leaves the selection (Firefox fires none) the state is stale",
+      "expect": "survive",
+      "why": "BLIND SPOT of jsdom: its selection API fires selectionchange on removeAllRanges / addRange, so after any format button (x² and x₂ put the selection back; undoKit's bold shim does too) the bar is read again without the input event. Firefox fires no selectionchange after execCommand('bold'), which leaves the selection where it was: there the B button stayed unpressed after B (MEASURED on main, keep-work-check TE1b, Firefox: boldPressed=false; Chromium and WebKit true). Guarded in Firefox.",
+      "browser": {
+        "harness": "scripts/keep-work-check.mjs",
+        "scenarios": [
+          "TE1l-list-state"
+        ],
+        "env": {
+          "POSTR_BROWSER": "firefox"
+        }
+      },
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    // B shows pressed after B (record 39, TE1b).\n    emitSelection();\n  };",
+          "    // B shows pressed after B (record 39, TE1b).\n  };"
+        ]
+      ]
+    },
+    "no-list-state": {
+      "undoes": "T1 — bullets and numbered never show pressed (as on main)",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    bulletList: listState(el, range, 'UL'),\n    numberedList: listState(el, range, 'OL'),",
+          "    bulletList: false,\n    numberedList: false,"
+        ]
+      ]
+    },
+    "no-commit": {
+      "undoes": "T1/T2 — the change is not committed: no input event, nothing stored, no undo step",
+      "edits": [
+        [
+          "src/poster/scriptFormat.ts",
+          "  host.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: tag === 'sup' ? 'formatSuperscript' : 'formatSubscript' }));\n",
+          ""
+        ]
+      ]
+    },
+    "selection-lost": {
+      "undoes": "T1 — the selection is not put back after the change (the same characters selected, so the button can be pressed again)",
+      "edits": [
+        [
+          "src/poster/scriptFormat.ts",
+          "    sel.removeAllRanges();\n    sel.addRange(r);\n  }\n  return true;",
+          "    sel.removeAllRanges();\n  }\n  return true;"
+        ]
+      ]
+    },
+    "no-join": {
+      "undoes": "T1 — a superscript next to another stays a second element (markup only; joined for clean runs)",
+      "edits": [
+        [
+          "src/poster/scriptFormat.ts",
+          "      el.append(...Array.from(next.childNodes));\n      const gone = next;\n      next = next.nextSibling;\n      gone.remove();",
+          "      next = null;"
+        ]
+      ]
+    },
+    "split-drops-line-break": {
+      "undoes": "T1 — splitting a superscript around the selection drops a part that holds only a line break",
+      "edits": [
+        [
+          "src/poster/scriptFormat.ts",
+          "  const keep = (f: DocumentFragment) => !!f.textContent || f.querySelector('br') !== null;",
+          "  const keep = (f: DocumentFragment) => !!f.textContent;"
+        ]
+      ]
+    },
+    "no-script-keys": {
+      "undoes": "T2 — no key handler: Ctrl + Shift + = and Ctrl + = do nothing in text (as on main)",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    const script = scriptKeyAction(e.nativeEvent, MAC);\n    if (script) {\n      e.preventDefault();\n      toggleScript(script);\n      return;\n    }\n",
+          ""
+        ]
+      ]
+    },
+    "key-not-taken": {
+      "undoes": "T2 — the key toggles but is not cancelled, so a Windows browser also zooms the page",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    if (script) {\n      e.preventDefault();\n      toggleScript(script);",
+          "    if (script) {\n      toggleScript(script);"
+        ]
+      ]
+    },
+    "windows-key-taken": {
+      "undoes": "T2 — on Windows the Windows key with Ctrl + = is taken (it is not PowerPoint's key there)",
+      "edits": [
+        [
+          "src/poster/scriptFormat.ts",
+          "  if (e.metaKey && !mac) return null;\n",
+          ""
+        ]
+      ]
+    },
+    "keys-swapped": {
+      "undoes": "T2 — Shift picks subscript (the two keys swapped)",
+      "edits": [
+        [
+          "src/poster/scriptFormat.ts",
+          "  return e.shiftKey ? 'sup' : 'sub';",
+          "  return e.shiftKey ? 'sub' : 'sup';"
+        ]
+      ]
+    },
+    "slash-anywhere": {
+      "undoes": "T4 — \"/\" anywhere opens the menu (the matcher as on main: \"n/a\" + Enter gave \"nα\")",
+      "edits": [
+        [
+          "src/poster/slashCommand.ts",
+          "  const m = textBeforeCaret.match(/(?:^|\\s)(\\/([a-zA-Z0-9]*))$/);",
+          "  const m = textBeforeCaret.match(/()(\\/([a-zA-Z0-9]*))$/);"
+        ],
+        [
+          "src/poster/slashCommand.ts",
+          "    literal,\n    prefix: m[2] ?? '',",
+          "    literal: m[2]!,\n    prefix: m[3] ?? '',"
+        ],
+        [
+          "src/poster/slashCommand.ts",
+          "  if (!m || m[1] === undefined) return null;\n  const literal = m[1];",
+          "  if (!m || m[2] === undefined) return null;\n  const literal = m[2];"
+        ]
+      ]
+    },
+    "no-br-line": {
+      "undoes": "T4 — a <br> is not a line break for the matcher: \"/\" at the start of a line typed after a line break opens no menu",
+      "edits": [
+        [
+          "src/poster/slashCommand.ts",
+          "        if (tag === 'BR') {\n          out += '\\n';\n          continue;\n        }",
+          "        if (tag === 'BR') {\n          continue;\n        }"
+        ]
+      ]
+    },
+    "no-div-line": {
+      "undoes": "T4 — a line the browser put in a <div> or list item does not start a line for the matcher",
+      "edits": [
+        [
+          "src/poster/slashCommand.ts",
+          "        if (LINE_TAGS.has(tag) && out !== '' && !out.endsWith('\\n')) out += '\\n';\n",
+          ""
+        ]
+      ]
+    },
+    "enter-inserts": {
+      "undoes": "T4 — Enter inserts the highlighted symbol with no arrow pressed (as on main)",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "        if (slash.moved && plain) {",
+          "        if (plain) {"
+        ]
+      ]
+    },
+    "no-arrows": {
+      "undoes": "T4 — ↑ ↓ do not move the highlight (as on main: they moved the caret)",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && plain) {",
+          "      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && plain && false) {"
+        ]
+      ]
+    },
+    "arrow-keyup-rereads": {
+      "undoes": "T4 — the arrow's keyup reads the menu again, which puts the highlight back on the first entry",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    if (menuArrow.current && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {\n      menuArrow.current = false;\n      return;\n    }\n",
+          ""
+        ]
+      ]
+    },
+    "tab-takes-first": {
+      "undoes": "T4 — Tab inserts the first entry, not the highlighted one",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "      if (e.key === 'Tab' && plain) {\n        e.preventDefault();\n        insertSymbolAt(chosen[0]);",
+          "      if (e.key === 'Tab' && plain) {\n        e.preventDefault();\n        insertSymbolAt(items[0]![0]);"
+        ]
+      ]
+    },
+    "eight-entries": {
+      "undoes": "T4 — the menu lists 8 of the symbols (as on main), not all of them",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "const slashEntries = (prefix: string) => filterSymbols(prefix, Number.POSITIVE_INFINITY);",
+          "const slashEntries = (prefix: string) => filterSymbols(prefix, 8);"
+        ]
+      ]
+    },
+    "open-with-nothing": {
+      "undoes": "T4 — the menu counts as open with nothing to list (\"/zq\"): the arrows, Tab and Esc are taken from the text",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    if (!match || !sel || slashEntries(match.prefix).length === 0) {",
+          "    if (!match || !sel) {"
+        ]
+      ]
+    },
+    "title-enter-passes": {
+      "undoes": "T4 — in a title, Enter with the menu open is let through (main's single-line rule read the menu as it was before the key)",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    if (!multiline && e.key === 'Enter') {\n      e.preventDefault();\n    }",
+          "    if (!multiline && e.key === 'Enter' && !slash.open) {\n      e.preventDefault();\n    }"
+        ]
+      ]
+    },
+    "symbol-joins-lines": {
+      "undoes": "T4 (sibling, TE4j) — the symbol's start at a line boundary is put at the end of the line before, so inserting it deletes the line break (as on main)",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    if (side === 'start' ? consumed + len > offset : consumed + len >= offset) {",
+          "    if (consumed + len >= offset) {"
+        ]
+      ]
+    },
+    "copy-browser-own": {
+      "undoes": "T3 (review R1-F1) — a copy or cut of superscript or subscript text alone is left to the browser, which in Chromium and WebKit writes it as a plain <span> (MEASURED, keep-work-check TE3i)",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    const copy = scriptedCopy(el, range);",
+          "    const copy: ReturnType<typeof scriptedCopy> = null;"
+        ]
+      ]
+    },
+    "copy-any-selection": {
+      "undoes": "T3 (review R1-F1) — the editor takes every copy, also one that reaches outside a sup or sub, which the browser's own copy already keeps (the page's clipboard then drops what the browser writes)",
+      "edits": [
+        [
+          "src/poster/scriptClipboard.ts",
+          "  if (!wraps.some((el) => el.tagName === 'SUP' || el.tagName === 'SUB')) return null;\n",
+          ""
+        ]
+      ]
+    },
+    "copy-without-formats": {
+      "undoes": "T3 (review R1-F1) — the copied piece is written without the sup or sub (and the b, i or u) around it",
+      "edits": [
+        [
+          "src/poster/scriptClipboard.ts",
+          "  for (const el of wraps) {",
+          "  for (const el of [] as Element[]) {"
+        ]
+      ]
+    },
+    "cut-not-deleted": {
+      "undoes": "T3 (review R1-F1) — a cut the editor takes writes the clipboard and leaves the text",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    deleteIn(el, range);\n",
+          ""
+        ]
+      ]
+    },
+    "cut-leaves-empty-sup": {
+      "undoes": "T3 (review R1-F1) — a cut the editor takes leaves an empty <sup> behind",
+      "edits": [
+        [
+          "src/poster/scriptClipboard.ts",
+          "  range.deleteContents();\n  tidy(host);\n",
+          "  range.deleteContents();\n"
+        ]
+      ]
+    },
+    "cut-not-own-step": {
+      "undoes": "fix 12's rule for a cut the editor takes (review R1-F1) — it fires no beforeinput, so a one-character cut reads as a Backspace and the next Backspace joins its undo step",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "    document.addEventListener('cut', noteCut, true);\n",
+          ""
+        ]
+      ]
+    },
+    "numpad-taken": {
+      "undoes": "T2 (review R1-F3) — Ctrl + the numeric keypad's + is taken in text as subscript (with Shift superscript), cancelling a Windows browser's zoom-in",
+      "edits": [
+        [
+          "src/poster/scriptFormat.ts",
+          "!(e.code ?? '').startsWith('Numpad') && (e.key === '=' || e.key === '+' || e.code === 'Equal')",
+          "(e.key === '=' || e.key === '+' || e.code === 'Equal')"
+        ]
+      ]
+    },
+    "keyup-any-arrow": {
+      "undoes": "T4 (review R1-F6) — the keyup skips reading the menu again for ↑ ↓ whatever the keydown was (the first version): it stays open over the selection Shift + ↓ made, and Tab inserts a symbol",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    if (menuArrow.current && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {",
+          "    if (slash.open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {"
+        ]
+      ]
+    },
+    "symbol-by-exec": {
+      "undoes": "T4 (review R1-F2) — the symbol replaces the `/prefix` with execCommand('insertText') again: in Firefox, over the whole text of a line made with Shift + Enter, that deletes the <br> before it",
+      "expect": "survive",
+      "why": "BLIND SPOT of jsdom: undoKit's execCommand shim replaces the selected text the way the DOM does (Range.deleteContents), so the <br> stays there either way; only Firefox's own insertText removes it (MEASURED before the change, keep-work-check TE4jb, TE4ju and TE4jl in Firefox: stored \"ZQB1<br>ZQB2α ZQBE\" and \"<ul><li>ZQL1α ZQLE</li></ul>\"; Chromium and WebKit clean). Guarded in Firefox.",
+      "browser": {
+        "harness": "scripts/keep-work-check.mjs",
+        "scenarios": [
+          "TE4-slash-br-line"
+        ],
+        "env": {
+          "POSTR_BROWSER": "firefox"
+        }
+      },
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "  prefix.deleteContents();\n  let at: [Node, number];\n  if (prefix.startContainer.nodeType === Node.TEXT_NODE) {\n    const text = prefix.startContainer as Text;\n    text.insertData(prefix.startOffset, symbol);\n    at = [text, prefix.startOffset + symbol.length];\n  } else {\n    const text = document.createTextNode(symbol);\n    prefix.insertNode(text);\n    at = [text, symbol.length];\n  }\n  const after = document.createRange();\n  after.setStart(...at);\n  after.collapse(true);\n  sel.removeAllRanges();\n  sel.addRange(after);\n",
+          "  sel.removeAllRanges();\n  sel.addRange(prefix);\n  document.execCommand('insertText', false, symbol);\n"
+        ]
+      ]
+    },
+    "keyup-modifiers": {
+      "undoes": "T4 (review R1-F6) — the keyup's own modifiers decide (correction 1's first form): with Shift let go before the arrow, the keyup reads as a plain ↓ and the menu stays open over the selection",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    if (menuArrow.current && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {",
+          "    if (slash.open && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {"
+        ]
+      ]
+    },
+    "menu-as-main": {
+      "undoes": "T4 (review R1-F5) — the menu always opens below the caret at its full 220 px (as on main): near the window's bottom it is drawn partly below it, and ↑ takes the highlight out of sight",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "  if (below >= MENU_MAX || below >= above) return { top: caret.bottom + MENU_GAP, left: caret.left, maxHeight: Math.max(0, Math.min(MENU_MAX, below)) };",
+          "  return { top: caret.bottom + MENU_GAP, left: caret.left, maxHeight: MENU_MAX };"
+        ]
+      ]
+    },
+    "menu-no-flip": {
+      "undoes": "T4 (review R1-F5) — the menu stays below the caret, only cut to the room there: inside the window, but shorter (191 px of entries in TE4b's window instead of 220); the browser claim TE4b, which asks only for the window, does not see this one (MEASURED: clean with it), the entry test does",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "  if (below >= MENU_MAX || below >= above) return",
+          "  if (true) return"
+        ]
+      ]
+    }
+  }
+}
