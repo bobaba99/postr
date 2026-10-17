@@ -12,11 +12,12 @@
  * a descriptive message. Callers never have to inspect `{ data, error }`
  * tuples themselves.
  */
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseKey, supabaseUrl } from '@/lib/supabase';
 import { isStaleJwtError } from '@/lib/auth';
 import type { Database, Json, PosterDoc } from '@postr/shared';
 import { usableSheetSize } from '@/poster/constants';
 import { forgetPosterScript } from '@/poster/figureScriptDraft';
+import { dropKept } from '@/hooks/keptChanges';
 
 type PosterUpdateRow = Database['public']['Tables']['posters']['Update'];
 
@@ -283,6 +284,48 @@ export async function loadOrCreateMostRecentPoster(): Promise<PosterRow> {
 }
 
 /**
+ * The largest body a save sent with `keepalive` may have, in bytes (UTF-8).
+ * The Fetch standard refuses a keepalive request once the bodies of the
+ * page's keepalive requests in flight would pass 64 KiB ("HTTP-network-or-
+ * cache fetch", the inflight keepalive bytes); the rest is left for the
+ * page's other keepalive requests (the diagnostics batch, lib/diagnostics.ts;
+ * the analytics beacon). Real posters' saves are 1–9 KB (MEASURED, fix 38,
+ * keep-work-check L2-sizes). Per request: two posters' changes kept at once
+ * (fix 38, review round 3, R3-7) each send their own at a leave, against the
+ * one quota, so of two bodies over 32 KiB the second is refused.
+ */
+export const KEEPALIVE_BODY_MAX = 60 * 1024;
+
+/**
+ * A save that failed, with the HTTP status of the server's answer, 0 when
+ * there was none (the network, or the browser cut the request off). The
+ * autosave hook reads it (fix 38, review round 3, R3-1): a server's error
+ * answer says the write was not stored, so it is not one the browser may
+ * have cut off after the server had it; and its failure report carries it.
+ */
+export class SaveError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/**
+ * A save sent as the page is left (fix 38, docs/fixes/38-save-on-leave.md):
+ * `keepalive` asks the browser to finish the request after the page has gone.
+ * `accessToken` is the session's, known at once: the client's own lookup is
+ * asynchronous, and the page is gone before it answers (MEASURED on main, in
+ * Chromium: the leave's save made no request in 16 of 20 ways out, and one
+ * made after the leave began, never received, in the other 4).
+ */
+export interface SaveOptions {
+  keepalive?: boolean;
+  accessToken?: string | null;
+}
+
+/**
  * Patches a poster row. Used by:
  *   - the autosave hook (passes `data`)
  *   - the rename action (passes `title`)
@@ -291,8 +334,14 @@ export async function loadOrCreateMostRecentPoster(): Promise<PosterRow> {
  *
  * Always bumps `updated_at` so the Home page ordering reflects the
  * most recent edit.
+ *
+ * With `keepalive` and a session token (fix 38), the request is sent before
+ * this function first waits, with `keepalive: true`: the same address,
+ * method, headers and body as the client's own update below
+ * (`posterKeepalive.test.ts` compares them). Without a token, or with a body over
+ * KEEPALIVE_BODY_MAX, it is the client's own update, as every other save.
  */
-export async function upsertPoster(id: string, update: PosterUpdate): Promise<PosterRow> {
+export async function upsertPoster(id: string, update: PosterUpdate, options: SaveOptions = {}): Promise<PosterRow> {
   const payload: PosterUpdateRow = {
     updated_at: new Date().toISOString(),
   };
@@ -302,7 +351,14 @@ export async function upsertPoster(id: string, update: PosterUpdate): Promise<Po
   if (update.data !== undefined) payload.data = update.data as unknown as Json;
   if (update.thumbnailPath !== undefined) payload.thumbnail_path = update.thumbnailPath;
 
-  const { data, error } = await supabase
+  if (options.keepalive && options.accessToken) {
+    const body = JSON.stringify(payload);
+    if (new TextEncoder().encode(body).length <= KEEPALIVE_BODY_MAX) {
+      return readSaved(sendKeepalive(id, body, options.accessToken));
+    }
+  }
+
+  const { data, error, status } = await supabase
     .from('posters')
     .update(payload)
     .eq('id', id)
@@ -310,9 +366,48 @@ export async function upsertPoster(id: string, update: PosterUpdate): Promise<Po
     .single();
 
   if (error) {
-    throw new Error(`Failed to save poster: ${error.message}`);
+    // The client answers status 0 when its fetch failed (no answer).
+    throw new SaveError(`Failed to save poster: ${error.message}`, status ?? 0);
   }
   return data as unknown as PosterRow;
+}
+
+/**
+ * The client's update of one poster row (`.update().eq('id').select('*')
+ * .single()`), built here so it can leave at once: PostgREST's address and
+ * filter, PATCH, the project key and the session's token, JSON in, the one
+ * row back (`vnd.pgrst.object`: no row is an error, as `.single()`).
+ */
+function sendKeepalive(id: string, body: string, accessToken: string): Promise<Response> {
+  const url = `${supabaseUrl.replace(/\/+$/, '')}/rest/v1/posters?id=eq.${encodeURIComponent(id)}&select=*`;
+  return fetch(url, {
+    method: 'PATCH',
+    keepalive: true,
+    headers: {
+      Accept: 'application/vnd.pgrst.object+json',
+      apikey: supabaseKey,
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Profile': 'public',
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    },
+    body,
+  });
+}
+
+/**
+ * The saved row from a keepalive save's response, or the save's error as the
+ * client words it, with the answer's status (`SaveError`). A request with no
+ * answer rejects as `fetch` does (no status: none).
+ */
+async function readSaved(sent: Promise<Response>): Promise<PosterRow> {
+  const res = await sent;
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message = (json as { message?: string } | null)?.message ?? `${res.status} ${res.statusText}`.trim();
+    throw new SaveError(`Failed to save poster: ${message}`, res.status);
+  }
+  return json as PosterRow;
 }
 
 /**
@@ -455,7 +550,9 @@ export async function ensureShareLink(posterId: string): Promise<string> {
  * to drop the entire poster + its related rows.
  *
  * Orphaned storage objects are swept by the nightly cron (Task 10.2).
- * The plot script this browser kept for the poster goes with it.
+ * The plot script this browser kept for the poster goes with it, and so
+ * does a change its closed editor made that the page still keeps (fix 38,
+ * review round 2, R2-4: hooks/keptChanges.ts).
  */
 export async function deletePoster(id: string): Promise<void> {
   const { error } = await supabase.from('posters').delete().eq('id', id);
@@ -464,4 +561,5 @@ export async function deletePoster(id: string): Promise<void> {
     throw new Error(`Failed to delete poster: ${error.message}`);
   }
   forgetPosterScript(id);
+  dropKept(id);
 }

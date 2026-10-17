@@ -11,6 +11,10 @@
  *   3. Skip the FIRST render (loading a poster from the server into the
  *      store must not trigger an immediate save of the same document).
  *   4. Flush a pending save on unmount so in-flight edits are never lost.
+ *      With a session that can store it, a change not stored yet is then
+ *      kept and retried after the editor has gone (fix 38, review round 1:
+ *      src/poster/__tests__/saveOnLeave.test.tsx, L3); with none, as here
+ *      (the client in these tests has no session), one last try only.
  *   5. Cancel a pending debounce when posterId changes (switching posters
  *      must not save the outgoing doc under the incoming id).
  *   6. Surface save errors via status = 'error' without throwing.
@@ -251,7 +255,9 @@ describe('useAutosave', () => {
       // Every save keeps the row's size columns in step (fix 02, cause E).
       widthIn: 48,
       heightIn: 36,
-    });
+      // Sent to outlive the page (fix 38): a tab closed right after the
+      // editor was left inside the app lost it, with no dialog.
+    }, expect.objectContaining({ keepalive: true }));
   });
 
   describe('a failed save (fix 27)', () => {
@@ -363,7 +369,7 @@ describe('useAutosave', () => {
       expect(upsertMock.mock.calls[1]![1]).toMatchObject({ data: expect.objectContaining({ fontFamily: 'Lora' }) });
     });
 
-    it('is not retried once the editor has gone (one last try as it closes)', async () => {
+    it('is not retried once the editor has gone with no session that could store it (one last try as it closes)', async () => {
       upsertMock.mockRejectedValue(new Error('Failed to fetch'));
       const { rerender, unmount } = renderHook(({ doc }) => useAutosave('poster-1', doc), {
         initialProps: { doc: makeDoc('Inter') },

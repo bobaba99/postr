@@ -17,6 +17,15 @@ if (!url || !publishableKey) {
   );
 }
 
+/**
+ * The project's address and publishable key, for the one request the app
+ * builds itself: the poster's save sent with `keepalive` as the page is left
+ * (data/posters.ts `upsertPoster`, fix 38), which cannot wait for the
+ * client's own asynchronous session read.
+ */
+export const supabaseUrl: string = url;
+export const supabaseKey: string = publishableKey;
+
 export const supabase: SupabaseClient<Database> = createClient<Database>(url, publishableKey, {
   auth: {
     persistSession: true,

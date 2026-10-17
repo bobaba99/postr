@@ -18,6 +18,7 @@ import { makeBlocks } from '@/poster/templates';
 import { DEFAULT_STYLES, PALETTES, withUsableSheetSize } from '@/poster/constants';
 import { useTwoTabGuard } from '@/hooks/useTwoTabGuard';
 import { useLeaveGuard } from '@/hooks/useLeaveGuard';
+import { keptChange } from '@/hooks/keptChanges';
 import { useSignedInUser } from '@/hooks/useSignedInUser';
 import { PosterClosedPage } from '@/components/PosterClosedPage';
 import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
@@ -241,6 +242,11 @@ export default function Editor() {
 
     (async () => {
       try {
+        // A change kept for this poster, read before the load waits: its
+        // write may be stored while the load is out (the page then forgets
+        // it), and the load's answer can be older than it (fix 38, review
+        // round 2, R2-2; MEASURED, keep-work-check L3-inapp-reopen-race).
+        const keptAtLoad = posterId && posterId !== 'new' ? keptChange(posterId) : null;
         // Try the URL id first. If that fails (unknown id, RLS miss,
         // or the "/p/new" sentinel) fall through to load-or-create.
         let row =
@@ -266,10 +272,16 @@ export default function Editor() {
           return;
         }
         openedRef.current = { posterId: row.id, userId };
+        // A change made in this poster's editor, which closed before the
+        // change was stored, is still being saved by the page, or was stored
+        // while the load was out: the poster opens as the user left it, not
+        // as the server's older copy (fix 38, review round 1, R1-1; round 2,
+        // R2-2), and its editor takes any saving still owed over.
+        const kept = keptChange(row.id) ?? (row.id === posterId ? keptAtLoad : null);
         // normalizeStaleStyles runs first so that docs saved before
         // the typography calibration fix (title:60, heading:28, etc.)
         // self-heal on load without needing a db reset.
-        const raw = row.data as PosterDoc;
+        const raw = (kept?.doc ?? row.data) as PosterDoc;
         const hydrated = hydrateIfEmpty(normalizeSheetSize(normalizeStaleStyles(raw), row));
         // Seeding is opt-in and belongs to the EDITING entry point only.
         // Inside the editor the acknowledgement is fixed: seeded on load
@@ -281,7 +293,7 @@ export default function Editor() {
         // Share.tsx renders a poster exactly as stored, version restore
         // already keeps the mark via the lock guard, and importPostr
         // calls ensureAckBlock itself.
-        setPoster(row.id, hydrated, row.title, { seedAcknowledgement: true, ownerId: row.user_id });
+        setPoster(row.id, hydrated, kept ? (kept.title ?? row.title) : row.title, { seedAcknowledgement: true, ownerId: row.user_id });
         // Normalize the URL so refreshes land on the real id, not "/p/new"
         if (posterId !== row.id) {
           addressSetRef.current = row.id;

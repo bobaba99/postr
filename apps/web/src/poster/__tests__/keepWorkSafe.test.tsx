@@ -147,6 +147,10 @@ describe('a failed save is kept and tried again', () => {
     await typeWord(' ZQLEAVE');
     await advance(800);
     await settle();
+    // A moment after the failure: a close within 200 ms of it counts the
+    // failed write as cut by the leave (fix 38, review round 2, R2-1), and
+    // nothing is then sent for 10 s (saveOnLeave.test.tsx).
+    await advance(300);
     expect(closeTab(), 'after the failed save').toBe(true);
     await advance(2100);
     await settle();
