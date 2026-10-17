@@ -111,19 +111,68 @@ scope becomes a plan item or a question for the owner.
   (MEASURED from layout and the grid's computed CSS by
   `ruler-check.mjs`'s INFO `grid` reading; paint not read). The same kind
   of cause as fix 04; the rulers' measured sheet position could feed its
-  `background-position` (record 04 section 6).
+  `background-position` (record 04 section 6). Since record 29 the grid is
+  not drawn (`ADJUSTMENTS_ENABLED` off; ruler-check's `grid` reading is null
+  in every scenario on `ac7d793`, record 04 section 10), so this waits for the
+  grid's return.
 - At the 20 % zoom floor the rulers draw a mark every 2 px (an inch is
   2 px): a solid band, no labels readable (INSPECTED, from fix 04's
   `zoom-out-to-floor` numbers; not looked at by eye).
-- The rulers lag the sheet by a frame while the canvas animates or scrolls
-  (MEASURED by fix 04's step 9 reviewer, `transient-probe.mjs`, from layout
-  at each animation frame; paint not read): closing the guidelines panel at
-  1920 × 1080, 13 of 168 and 16 of 172 frames over 0.5 px, worst 87.08 and
-  88.17 px; hiding the sidebar at 1280 × 800, 16 of 174 frames, worst
-  133.36 px, each on the first frame after the click; a 30 px wheel scroll,
-  1 of 179 frames, 30 px, the same as main; at rest 0. Likely because the
-  reading is set from the resize callback and renders after that frame
-  paints (INSPECTED, the reviewer's inference).
+- On a wheel scroll the compositor paints the scrolled sheet before the page
+  runs any code, so the rulers show the old position for a frame or two
+  (main's too; no page code removes it). Painted frames, production build:
+  Chromium 8 of 8 events on the fix and on main, Firefox 1 of 8 against
+  main's 2 of 8, WebKit 0 of 8 against 4 of 8 (MEASURED by fix 04's second
+  step 10 review, its reviewer R3, on main `7f93b5b`; not re-measured on
+  `ac7d793`). The other lags this entry used to list (the guidelines panel
+  closing, the sidebar hiding) were fix 04's own and its cause C fixed them
+  (record 04).
+- Fix 04, E-02: leaving Preview after the window grew renders the rulers
+  synchronously in one long frame: 597 against 250 ms without that path in
+  the dev build (the step 9-F review), 76–95 ms against main's 60–253 ms in
+  production (fix 04's second step 10 review, R3), both Chromium at 4× CPU
+  (MEASURED on `7f93b5b`; not re-measured since the port).
+- Fix 04, the 600 px margin: its unit-test bound lies between 300 (fails)
+  and 600; 500 passes and is unmeasured in a browser (TESTED).
+- Fix 04, S9C-06: Firefox logs a scroll-linked positioning warning; whether
+  it is linked to a wheel scroll's lagging frame (1 of 8 events on the fix
+  against 2 of 8 on main, MEASURED by fix 04's second step 10 review, R3) is
+  not measured.
+- Fix 04, the pinch's cost: each step spends more time in the rulers than on
+  main (production, 4× CPU: 8.5 against 6.4 ms per step; a frame over 50 ms in
+  5 of 6 runs against 2 of 6; MEASURED by the second step 10 review's critic
+  on `7f93b5b`).
+- Fix 04, the number of marks grows with how far the content reaches (a block
+  1,000 in off the sheet: 1,099 top marks at the fit against 143; MEASURED by
+  the second step 10 review's critic).
+- Fix 04, R1-F1 of its first step 10 review: with CSS `zoom` on the page (no
+  user control sets it), the rulers mix zoomed and unzoomed pixels (MEASURED
+  by that reviewer on `7f93b5b`).
+- Fix 04's first step 10 review, main's own (MEASURED by its R2 and R3 on
+  `7f93b5b`): Zoom in and Zoom out zoom about the scroll origin, not the
+  view's centre (R2-02); a pinch over the zoom bar is not default-prevented
+  (R2-03); a 5-inch label pops in at a bar's start (R2-04); the text editor's
+  focus hint stays behind when the sidebar hides or the window resizes (R3-04).
+- Ruler units other than inches (centimetres, points): not offered (fix 04's
+  bounded design, record 04 section 11).
+- Fix 04's paint judge cannot judge Firefox: its known-answer control (each
+  marks' layer moved half a device pixel by a translate) reads 0 of 55 ticks
+  smeared there, since Firefox paints the translated layer snapped (MEASURED
+  by the review of the port, R1-F2, and by its corrector, record 04 §11.9).
+  A control Firefox cannot snap (a layer scaled by a non-integer factor)
+  would be needed; until then Firefox's painted ticks are manual-test-flows
+  §41's.
+- The browser's own File › Print of the editor page (which no key the app
+  catches; ⌘P prints the poster) prints the editor page itself: the sidebar,
+  the top bar and the canvas (MEASURED under print media by the review of
+  fix 04's port, R1-F3: the sidebar laid out and shown). Since that review
+  the rulers are hidden there (record 04 §11.9); the rest is main's own. A
+  print stylesheet for the editor chrome, or a `beforeprint` that hands over
+  to the app's print, would cover it.
+- Fix 04 at a browser zoom, beyond Chromium: the painted ticks at ratios 0.9,
+  1.1, 1.8 and 2.2 are measured in Chromium only (record 04 §11.9); WebKit's
+  and Firefox's at those ratios, and a real Ctrl/Cmd +/− (emulated here as a
+  device scale factor), are not run.
 - With reduced motion requested (`prefers-reduced-motion`), opening the
   guidelines panel still animates the canvas's width, through 12 distinct
   values (MEASURED by fix 04's step 9 reviewer, round 2,
@@ -396,13 +445,14 @@ scope becomes a plan item or a question for the owner.
   (MEASURED by the step 9 reviewer of 60ca7b3, mutant F6; it predates that
   change).
 
-- **Item 4, the rulers, hidden by the owner (2026-09-30):** `RULERS_ENABLED`
-  is off; the fix is parked on the local branch `editor/rulers-match-sheet`
-  (its record, `ruler-check.mjs`, `ruler-sync-check.mjs` and a first
-  `ruler-paint-check.mjs`). Open there: placing the marks by layout instead of
-  a transform (the step 9-G critic's CG-1), a committed paint check (CG-3),
-  and skipping its share scenarios while sharing is hidden. The ruler items
-  above wait for it.
+- **Item 4, the rulers, hidden by the owner (2026-09-30), un-parked on
+  2026-10-16 ("start them now"):** finished on `fix/04-rulers` (the parked
+  branch `editor/rulers-match-sheet` brought onto main `ac7d793`) and shown
+  again, `RULERS_ENABLED = true` (record `docs/fixes/04-rulers-match-sheet.md`,
+  section 11): the marks placed by layout, not a transform (CG-1, decided by
+  `ruler-paint-check.mjs`, now committed and run), the share scenarios
+  skipped while sharing is hidden, and the guidelines panel's while
+  `EDITOR_EXTRAS_ENABLED` is off. The ruler items above stay on this list.
 - **Fix 13, legend titles** are raised with legend text (fix 13b keeps it:
   `legend.title_fontsize` is set with `legend.fontsize`). Not a class the
   checker lists, so a policy for the owner: f32 at 4 × 3 in crosses 1.394 in²
@@ -1570,7 +1620,7 @@ Found while fixing one item, belonging to another (details in the record named):
   shrank instead (−124 px with main's open panel → −61.5 px), because the
   panel now starts closed. On the filled axis it is the bar's 24 px, before
   and after. Item 4 must re-measure at the shipped defaults. `fit-check.mjs` claim Hr
-  guards the filled axis at 24 px; item 4 must update that guard. (Since 2026-09-30 the rulers are hidden, `RULERS_ENABLED`; Hr measures nothing and the run says so.)
+  guards the filled axis at 24 px; item 4 must update that guard. (Since 2026-09-30 the rulers are hidden, `RULERS_ENABLED`; Hr measures nothing and the run says so.) **Done by item 4 (2026-10-16, record 04 §11):** re-measured at the shipped defaults on main `ac7d793` with the switch on (at 1280 × 800, +24 and −39.5 px), and Hr now guards both 0" marks at 0 within 0.5 px plus 1/64 px after Fit.
 - **Item 3**, same review: zoom-to-fit leaves 36 px of the limiting side out
   of view, and Zoom out zooms IN below its 0.3 floor. **Fixed by fix 03.**
 - **From fix 03** (a summary; record 03 section 10 is the complete list,
@@ -1722,7 +1772,7 @@ Found while fixing one item, belonging to another (details in the record named):
 | 2 | `editor/custom-sheet-size` (causes A, E), `editor/size-change-keeps-blocks` (B–D) | done — `docs/fixes/02-poster-size.md` |
 | 3 | `editor/fit-whole-sheet` (A, B), `editor/guidelines-closed-small-screens` (C, D, and A and B's review follow-ups) | done — `docs/fixes/03-fit-whole-sheet.md`; the owner answered its questions on 2026-09-30 (items 19–22; Firefox and WebKit engines installed) |
 | 23 | `fix/new-poster-owner-only` | done — `docs/fixes/23-new-poster-owner-only.md`; sharing and comments hidden (`SHARING_ENABLED`) |
-| 4 | `editor/rulers-match-sheet` (local, parked) | hidden — the owner hid the rulers on 2026-09-30 (`RULERS_ENABLED`, `config/features.ts`); the fix is parked unmerged with its record, instruments and open review findings |
+| 4 | `fix/04-rulers` (the parked `editor/rulers-match-sheet` brought onto main `ac7d793`) | implemented and shown again (`RULERS_ENABLED = true`; un-parked by the owner 2026-10-16, "start them now") — `docs/fixes/04-rulers-match-sheet.md` §11: reproduced on main with the switch on (every scenario off, up to 875 px; in three engines), then 0 marks over 0.516 px at rest and 0 stale frames of 102 events per engine (1024, 1280 and 1920 px, the sidebar shown and hidden), the marks placed by layout (decided by the painted ticks), the copies free of rulers. Review round 1 (2026-10-17, §11.9): R1-F1 fixed (at a browser zoom of 90 % or 110 % the painted 0" sat a device pixel off; the layers now round their place on the screen, not in the bar), R1-F3 fixed (File › Print of the editor page hides the rulers), R1-F4's stale sentences corrected, R1-F5's judge limit made half a device pixel at any ratio; R1-F2 recorded (Firefox's paint cannot be judged); corrected, its re-review is next |
 | 13 | `checker/python-reads-own-fix` (part 1), `fix/13p2-checker-sizes` (part 2, stream P: 13b; stream Q, 13c, merged in, next row) | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md`; part 2 implemented, review rounds 1 (17 findings: a tight save cut what it drew outside the plots, a `fontdict=`/`prop=` overwritten so the script raised, R theme order, `theme_void()`, a theme that is not ggplot2's, `ggsave(filename = …)`, `**kwargs`, and more) and 2 (13 findings: an R figure combining plots themed as a whole, a blank image for gridExtra; a panel letter replacing the centre title; a size the check cannot read pinned at the default and lowered; R names with a comment; PdfPages; colorbars seaborn and pandas make; sup-labels; legend guides; png() devices; advice from rows not drawn; `%+replace%`; loops over Axes) and 3 (5 findings: a theme held in a name or a function dropped from a combined figure's plots and base 11 written over it; the floor on a string font.size, an import above `from __future__`, `FontProperties as FP`; a passing unread size left unfloored; a plot drawn on its own line in a device, `grid.arrange()`, ragg; a cut legend at 4 × 3 in, accepted) done and answered — `docs/fixes/13b-checker-sizes.md` (the owner's design of 2026-10-07: a bounded rule table read by position, the last setting winning; a size or canvas the code leaves out marked `*` and set in the script the page asks you to use in place of yours; plain edits instead of part 1's helper. On the corpora with every review scenario, 116 Python and 61 R scripts × 4 sizes in real matplotlib, seaborn and ggplot2: first-check false passes 201 → 0 unmarked (Python; 10 on rows marked `*`) and 126 → 0 unmarked (R; 6 marked), re-check false greens 151 → 0 and 141 → 0, scripts whose fix leaves a text short or does not run 31 → 0 and 51 → 0, texts cut from the image 0 → 0, false fails 151 → 16 and 86 → 22 (rows marked `*`); R sizes written below what ggplot2 draws 68 → 0 (R texts printed smaller 78 → 15, all from a canvas the check cannot read, set to the size checked); Python 0 → 5, pass to pass: two seaborn grids at 14 × 10 in, an owner question, and a reset inside an `if`) |
 | 13 part 2, stream Q (13c) | `fix/13p2-chart-text` | fixed; its one review round (the browser, the user's entry points, the print path) answered: Q-R1 to Q-R5 held and are corrected (text measured in the chart's font, Plot's tick labels read back for the margins and spacing, legend and long labels wrapped inside the chart, each band holding its label's lines, a chart too small for its text at the minimums growing its block, "⎙ Save PDF" stripping the editor's chrome), Q-R7's cause found (a 1.5 px border the editor draws 1 px wide and the print 1.458 units), the rest on the Later list; re-measured in Chromium, Firefox and WebKit on the review's partition folded into the harness, 48 of 48 mutants killed, 10 blind spots guarded in the browser and 1 accepted; one more round is the lead's call (the corrections add mechanisms) — `docs/fixes/13c-chart-text-minimums.md` (one module of minimums for figure text, read by the code check's tables, the image scan and the charts; an inserted chart is drawn at the box it is laid out in, text at 18/24 pt never rounded and never below 14/18 (its floor 0.5 % above them, for print's rounding); chart blocks have an image's caption chrome, so the caption and its "Sample data, not real results." prefix show whole; in each of Chromium, Firefox and WebKit 0 of 1706 chart-sizes below the minimum, clipped, colliding or printed differently, from 408, 1705, 1077 and 18 on main in Chromium; 99 of 1706 grow their block, all at 6 × 4.5 to 8 × 6); the queued items above |
 | 7 | `fix/07-figure-script-kept` | done (three review rounds); review round 1 answered (a blank-line regression fixed, tests added, legal copy corrected); round 2 answered (a result checked against an image block is no longer shown under the preview's size, and a kept result says the size it is for; a long script edited after its Check stays stored); round 3 answered (a note no longer promises an image check comes back) — `docs/fixes/07-figure-script-kept.md`; the owner's decisions of 2026-10-06: the script kept per poster in this browser and re-checked on return, sessionStorage on the public page, Check stays up once a script is in, and the same cause fixed in the Authors, References, Make-a-figure, poster-name and version-name drafts (memory only) |

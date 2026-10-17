@@ -296,7 +296,7 @@ Because blocks never change column and keep their order, Auto-Arrange never chan
 
 **Bulk control:** the layout pick and Auto-Arrange.
 
-**Out of scope (Later):** moving blocks between columns to even them out (D6); changing the number of columns; Align and Distribute; smart guides to other blocks; grid settings; the visible grid (hidden); rulers (already hidden, `INSPECTED config/features.ts:67`); groups that are saved.
+**Out of scope (Later):** moving blocks between columns to even them out (D6); changing the number of columns; Align and Distribute; smart guides to other blocks; grid settings; the visible grid (hidden); ruler units other than inches, guides dragged out of the rulers, and the other ruler items on record 04's Later list (the rulers themselves are shown again since 2026-10-16, §3.14); groups that are saved.
 
 ### 3.6 Theme: palette and font
 
@@ -482,7 +482,7 @@ KEEP = in the MVP as it is. SIMPLIFY = in the MVP, cut down or fixed as stated. 
 | 3.11 | Delete | KEEP | — |
 | 3.12 | Align and distribute (missing) | LATER | Grid snap, layouts and Auto-Arrange do the MVP's aligning. |
 | 3.13 | Show grid | HIDE | Snapping works without it. Hidden means off: no grid drawn. |
-| 3.14 | Rulers | HIDE | Already off (`features.ts:67`); stays parked. |
+| 3.14 | Rulers | KEEP | Un-parked by the owner on 2026-10-16 ("start them now"), reversing this row's "stays parked" of 2026-10-07: fix 04 shows them again (`RULERS_ENABLED`, `config/features.ts`), their marks placed from where the sheet is laid out; inches only; "Show ruler" on as the editor opens, not remembered; never in the PDF, the thumbnail or the PowerPoint file, nor in the browser's own File › Print of the editor page (since the review of the port, R1-F3); the 0" marks on the sheet's corner at a browser zoom too (R1-F1) (record `docs/fixes/04-rulers-match-sheet.md`). |
 | 3.15 | Zoom | KEEP | A 48 in sheet cannot be edited at 100 %. |
 | 3.16 | Show / hide sidebar | KEEP | Navigation. |
 | 3.17 | Layout (Auto-Arrange, templates) | — | See 1.8 and 1.9. |
@@ -610,7 +610,7 @@ Each fix follows the house order: reproduce, state the cause, look for siblings,
 | **Item 6, group drag undo** | Do it right after item 12. It closes the "every drag is one step" promise. |
 | **Item 13 part 2, stream P** (checker reading; in `fix13p2-wt`) | **Keep and finish** (owner, 2026-10-07): the bounded regex rule table of §3.11, three review rounds. |
 | **Item 13 part 2, stream Q** (inserted chart text and captions; uncommitted in `charts-wt`) | **Stop if D1 hides charts** (recommended), and park it. If charts stay, OF-09 and OF-10 become MVP blockers and stream Q continues. |
-| **Item 4, rulers** | Stays parked and hidden. |
+| **Item 4, rulers** | Stayed parked and hidden until 2026-10-16, when the owner un-parked it ("start them now"): finished on `fix/04-rulers` and shown again (§3.14). |
 | **Items 5 and 8** (OF-07, OF-05) | Move up: they are blockers 4 and 2. |
 | **Next pair in flight** (two at a time, the owner's rule) | Item 12 plus OF-01. Then OF-05 and the starting-text change (blocker 3), then OF-07 and the reading order (blocker 5). |
 

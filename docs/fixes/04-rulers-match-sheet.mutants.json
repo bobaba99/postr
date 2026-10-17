@@ -1,0 +1,481 @@
+{
+  "tests": [
+    "src/poster/__tests__/rulers.test.tsx"
+  ],
+  "mutants": {
+    "marks-from-formula": {
+      "undoes": "A — the marks are placed from the sheet's measured position, not the old formula (the gutter less the scroll; step 9 review of cause C, S9C-01: with the scroll prop gone the old text left the marks at NaN)",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    if (topMarksRef.current) topMarksRef.current.style.left = `${snap(at.barX + at.x) - at.barX}px`;\n    if (leftMarksRef.current) leftMarksRef.current.style.top = `${snap(at.barY + at.y) - at.barY}px`;\n",
+          ""
+        ],
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "        <div ref={topMarksRef} style={{ position: 'absolute', left: 0, top: 0, bottom: 0 }}>",
+          "        <div ref={topMarksRef} style={{ position: 'absolute', left: gutterX - (canvasRef.current?.scrollLeft ?? 0), top: 0, bottom: 0 }}>"
+        ],
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "        <div ref={leftMarksRef} style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>",
+          "        <div ref={leftMarksRef} style={{ position: 'absolute', top: gutterY - (canvasRef.current?.scrollTop ?? 0), left: 0, right: 0 }}>"
+        ]
+      ]
+    },
+    "rulers-switched-off": {
+      "undoes": "the port onto main (2026-10-16, the owner's \"start them now\") — the rulers are shown: RULERS_ENABLED is on, so the editor draws them and the layout tab offers Show ruler",
+      "edits": [
+        [
+          "src/config/features.ts",
+          "export const RULERS_ENABLED = true;",
+          "export const RULERS_ENABLED = false;"
+        ]
+      ]
+    },
+    "rulers-printed": {
+      "undoes": "the review of the port, R1-F3 — the rulers never print: under print media (the browser's own File › Print of the editor page, which no key the app catches) their two bars and the corner are hidden",
+      "expect": "survive",
+      "why": "jsdom applies no print media and the tests load no stylesheet; ruler-check.mjs's file-print-media reads the page under Playwright's print media: on the tree before the rule, the two bars, the corner and 57 labels shown in Chromium, Firefox and WebKit, and none with it (record 04 section 11.9)",
+      "browser": {
+        "harness": "scripts/ruler-check.mjs",
+        "scenarios": [
+          "file-print-media"
+        ]
+      },
+      "edits": [
+        [
+          "src/index.css",
+          "@media print {\n  [data-postr-ruler] {\n    display: none !important;\n  }\n}\n",
+          ""
+        ]
+      ]
+    },
+    "measured-against-canvas": {
+      "undoes": "A (H2) — the sheet is measured against each ruler bar, not against the canvas the bars are 24 px inside",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    x: s.left - t.left, y: s.top - l.top, width: t.width, height: l.height,",
+          "    x: s.left - c.left, y: s.top - c.top, width: t.width, height: l.height,"
+        ]
+      ]
+    },
+    "resize-not-followed": {
+      "undoes": "B — a resize of the canvas or the sheet's frame re-reads the layout",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    const ro = new ResizeObserver(() => read());",
+          "    const ro = new ResizeObserver(() => {});"
+        ]
+      ]
+    },
+    "canvas-not-observed": {
+      "undoes": "B — the canvas itself is observed (a window resize or the guidelines panel closing, at a capped fit)",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    ro.observe(canvas);\n",
+          ""
+        ]
+      ]
+    },
+    "reads-painted-sheet": {
+      "undoes": "the rulers read the sheet's layout slot, which no animation moves, not its painted box (the entrance animation scales the frame and fires no event)",
+      "expect": "survive",
+      "why": "the test reports one box for the sheet and its holder, as a browser does at rest; ruler-check.mjs reads the rulers after the entrance animation in Chromium",
+      "browser": {
+        "harness": "scripts/ruler-check.mjs",
+        "scenarios": [
+          "as-opened-1280x800-48x36",
+          "fit-1280x800-60x30-default",
+          "fit-1280x800-60x30-nosidebar",
+          "fit-1440x900-60x30-default",
+          "fit-1440x900-60x30-nosidebar",
+          "fit-1920x1080-60x30-default",
+          "fit-1920x1080-60x30-nosidebar",
+          "fit-2560x1440-60x30-default",
+          "fit-2560x1440-60x30-nosidebar"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "  const slot = canvas.querySelector('[data-postr-canvas-frame]')?.parentElement;",
+          "  const slot = canvas.querySelector('#poster-canvas');"
+        ]
+      ]
+    },
+    "frame-not-observed": {
+      "undoes": "B — the sheet's frame is observed (a new poster height at an unchanged fit moves the sheet and resizes nothing else; found by step 9 review CR9-04-01)",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    if (sheetFrame) ro.observe(sheetFrame);\n",
+          ""
+        ]
+      ]
+    },
+    "gutter-not-followed": {
+      "undoes": "A — a change of the workarea's gutter re-reads the sheet's position (step 9 review CR9-04-05)",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "  }, [read, zoom, gutterX, gutterY]);",
+          "  }, [read, zoom]);"
+        ]
+      ]
+    },
+    "reading-after-paint": {
+      "undoes": "C — a reading from a resize or a scroll is put on the marks before the observer or the event returns, not by the render that follows",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    last.current = next;\n    place();\n",
+          "    last.current = next;\n"
+        ],
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    setDrawn((prev) => (prev && next && stillCovered(prev, next) ? prev : next));",
+          "    setDrawn(next);"
+        ],
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "  }, [canvasRef, topRef, leftRef, place]);\n",
+          "  }, [canvasRef, topRef, leftRef, place]);\n  useLayoutEffect(() => { place(); });\n"
+        ]
+      ]
+    },
+    "rulers-not-reading-scroll": {
+      "undoes": "C — the rulers read the sheet on the canvas's scroll event themselves",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    canvas.addEventListener('scroll', onScroll, { passive: true });\n",
+          ""
+        ]
+      ]
+    },
+    "render-inside-event": {
+      "undoes": "C — the rulers render nothing inside the observer or the event, so no pending render of the editor is pulled in there (step 9 review of cause C, S9C-02)",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    setDrawn((prev) => (prev && next && stillCovered(prev, next) ? prev : next));",
+          "    flushSync(() => setDrawn((prev) => (prev && next && stillCovered(prev, next) ? prev : next)));"
+        ]
+      ]
+    },
+    "marks-never-renewed": {
+      "undoes": "C — the rulers choose their marks again when a scroll or a zoom leaves the range they rendered",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    setDrawn((prev) => (prev && next && stillCovered(prev, next) ? prev : next));",
+          "    setDrawn((prev) => prev ?? next);"
+        ]
+      ]
+    },
+    "editor-scroll-state-removed": {
+      "undoes": "the editor re-renders on a canvas scroll, which keeps the text editor's focus hint on its block (the step 9 review of cause C, S9C-05)",
+      "expect": "survive",
+      "why": "the hint is placed from the browser's layout during render; jsdom does no layout, so no unit test sees it move",
+      "unguarded": "TESTED in the browser on 2026-09-30: with POSTR_MUTANT=<this spec>#editor-scroll-state-removed, `ruler-check.mjs --only text-hint-follows-scroll` exits 1 in 2 of 2 runs (the hint 4.72 px from its block, 64.72 px after a 60 px scroll); without it, exit 0 in 2 of 2 (4.72 → 3.99 px)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    el.addEventListener('scroll', onScroll, { passive: true });\n",
+          ""
+        ]
+      ]
+    },
+    "content-not-covered": {
+      "undoes": "C — the rulers render marks across the canvas's whole scrollable content, so no scroll, however far, leaves them",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    from: Math.min(contentStart - origin, -origin - margin),\n    to: Math.max(contentStart - origin + contentLength, length + margin - origin),",
+          "    from: -origin - margin + 0 * contentStart,\n    to: length + margin - origin + 0 * contentLength,"
+        ]
+      ]
+    },
+    "content-change-not-followed": {
+      "undoes": "C — a zoom, a resize or a size change chooses the marks again for the new content, even when the old ones still cover the bars",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "  return near(drawn.contentX - drawn.x, at.contentX - at.x) && near(drawn.contentWidth, at.contentWidth) &&\n    near(drawn.contentY - drawn.y, at.contentY - at.y) && near(drawn.contentHeight, at.contentHeight) &&\n    covers(drawn, at);",
+          "  return covers(drawn, at) || (near(0, 0) && false);"
+        ]
+      ]
+    },
+    "hidden-bars-read": {
+      "undoes": "C — a reading from hidden bars (Preview) is not adopted, so the marks are on the bars the moment the editor is shown again",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    if (next && (next.width <= 0 || next.height <= 0)) return;\n",
+          ""
+        ]
+      ]
+    },
+    "uncovered-rendered-later": {
+      "undoes": "C — when a reading would leave the bars with a stretch the marks on the page do not cover, the new marks are rendered before the observer or the event returns (the step 9-D review, D-01)",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "      else flushSync(() => setDrawn(next));\n",
+          "      else setDrawn(next);\n"
+        ]
+      ]
+    },
+    "margin-a-bar-length": {
+      "undoes": "C — the marks reach a capped margin past the bars, not a whole bar's length (the step 9-D review, D-03)",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "  const margin = Math.min(length, MARGIN_PX);",
+          "  const margin = length;"
+        ]
+      ]
+    },
+    "scrollbars-not-content": {
+      "undoes": "C (step 9-E, E-01) — the content reaches over the scrollbars that take space and a box's fractional width",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "contentWidth: canvas.scrollWidth + c.width - canvas.clientWidth - canvas.clientLeft + 1,",
+          "contentWidth: canvas.scrollWidth,"
+        ],
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "contentHeight: canvas.scrollHeight + c.height - canvas.clientHeight - canvas.clientTop + 1,",
+          "contentHeight: canvas.scrollHeight,"
+        ]
+      ]
+    },
+    "margin-zero": {
+      "undoes": "C (step 9-E, E-04) — the marks reach past the bars by a margin (a sidebar's width below the fit)",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "const MARGIN_PX = 600;",
+          "const MARGIN_PX = 0;"
+        ]
+      ]
+    },
+    "margin-300": {
+      "undoes": "C (step 9-E, E-04; step 9-F, F-03) — the margin covers a sidebar hiding while zoomed in, where the canvas's content goes from wider than its box to centred",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "const MARGIN_PX = 600;",
+          "const MARGIN_PX = 300;"
+        ]
+      ]
+    },
+    "flush-in-commit": {
+      "undoes": "C (step 9-E, E-03) — a reading taken in React's commit is not flushed there",
+      "expect": "survive",
+      "why": "jsdom's layout stub puts no uncovered reading in the zoom's layout effect (step 9-E, E-05), so no unit test takes the synchronous path inside a commit; where it is taken, React refuses the flush with a console error, which no test reads",
+      "unguarded": "jsdom never reaches it: its layout stub puts no uncovered reading in the zoom's layout effect (step 9-E, E-05). Falsified by scripts/ruler-sync-check.mjs --mutant flush-in-commit (Chromium, 2026-09-30): the window grown from 1280 x 800 to 1920 x 1080 at the fit, and leaving Preview after the window grew, each log React's \"flushSync was called from inside a lifecycle method\" once; 0 without the mutant",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    read(true);\n",
+          "    read();\n"
+        ]
+      ]
+    },
+    "no-plus-one": {
+      "undoes": "C (step 9-F, F-02) — the content reaches one pixel past the client box's rounding",
+      "expect": "survive",
+      "why": "jsdom does no layout, so its boxes carry no fraction past the client box; a stubbed one lands on the covered side with or without the pixel (a canvas 0.4 px wider than its client box, step 9-F, F-02)",
+      "unguarded": "jsdom's arithmetic lands on the covered side (a test with a canvas 0.4 px wider than its client box passed with and without it). Falsified by scripts/ruler-sync-check.mjs --mutant no-plus-one (Chromium, 2026-09-30): zoomed in 20 at the far end, Hide sidebar takes the synchronous path once; 0 without the mutant",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "contentWidth: canvas.scrollWidth + c.width - canvas.clientWidth - canvas.clientLeft + 1,",
+          "contentWidth: canvas.scrollWidth + c.width - canvas.clientWidth - canvas.clientLeft,"
+        ],
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "contentHeight: canvas.scrollHeight + c.height - canvas.clientHeight - canvas.clientTop + 1,",
+          "contentHeight: canvas.scrollHeight + c.height - canvas.clientHeight - canvas.clientTop,"
+        ]
+      ]
+    },
+    "workarea-not-observed": {
+      "undoes": "C (step 9-F, F-01) — the rulers read the layout again when the workarea, which centres the sheet, resizes",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    if (workarea) ro.observe(workarea);\n",
+          ""
+        ]
+      ]
+    },
+    "marks-off-pixel-grid": {
+      "undoes": "C (second step 10 review, R3-F1) — the marks' layers sit on whole device pixels, so a tick is painted crisp, not smeared over two; with the rounding removed the layers are placed by layout, unrounded, which is also the follow-up review's critic's probe layout-placed (CG-1)",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "style.left = `${snap(at.barX + at.x) - at.barX}px`",
+          "style.left = `${at.x}px`"
+        ],
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "style.top = `${snap(at.barY + at.y) - at.barY}px`",
+          "style.top = `${at.y}px`"
+        ]
+      ]
+    },
+    "dpr-change-ignored": {
+      "undoes": "C (the follow-up review, R2P-F1) — a device pixel ratio that changes with nothing resizing or scrolling puts the marks' layers on the new grid",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "      place();\n      listen();",
+          "      listen();"
+        ]
+      ]
+    },
+    "snap-floor": {
+      "undoes": "C (the follow-up review, R1G-F2 and R2P-F3) — the layers go on the NEAREST whole device pixel, not the one before: rounded down, the painted 0\" sits up to a device pixel before the sheet's edge",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "const snap = (v: number) => Math.round(v * dpr + TIE) / dpr;",
+          "const snap = (v: number) => Math.floor(v * dpr) / dpr;"
+        ]
+      ]
+    },
+    "layers-half-device-px-off": {
+      "undoes": "C (the follow-up review, R2P-F3 and CG-4) — the layers sit ON the device grid: placed half a device pixel past it, the browser snaps them a whole device pixel from the sheet's edge",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "style.left = `${snap(at.barX + at.x) - at.barX}px`",
+          "style.left = `${snap(at.barX + at.x) - at.barX + 0.5 / dpr}px`"
+        ],
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "style.top = `${snap(at.barY + at.y) - at.barY}px`",
+          "style.top = `${snap(at.barY + at.y) - at.barY + 0.5 / dpr}px`"
+        ]
+      ]
+    },
+    "snap-against-bar": {
+      "undoes": "C (the review of the port, R1-F1) — the layers go on the SCREEN's whole device pixels, not the bar's: at a browser zoom (a ratio of 0.9, 1.1, 1.8, 2.2) the bars sit at a fraction of a device pixel, and a layer rounded against its bar is rounded again when painted, the painted 0\" a device pixel off the sheet's painted edge (scripts/ruler-paint-check.mjs, chromium@0.9 …)",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "style.left = `${snap(at.barX + at.x) - at.barX}px`",
+          "style.left = `${snap(at.x)}px`"
+        ],
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "style.top = `${snap(at.barY + at.y) - at.barY}px`",
+          "style.top = `${snap(at.y)}px`"
+        ]
+      ]
+    },
+    "tie-rounded-down": {
+      "undoes": "C (the correction of the review of the port) — a reading within 1/128 of a device pixel below a half rounds up, as the browser rounds the half the sheet is laid out at: Chromium reports boxes at single precision, and a sheet at exactly 553.5 device px read back as 553.4999845 at a ratio of 2.2, so the 0\" was painted a device pixel before the sheet's edge (scripts/ruler-paint-check.mjs, chromium@2.2: 3 of 30 layouts)",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "const snap = (v: number) => Math.round(v * dpr + TIE) / dpr;",
+          "const snap = (v: number) => Math.round(v * dpr) / dpr;"
+        ]
+      ]
+    },
+    "transform-placed": {
+      "undoes": "C (the follow-up review's critic, CG-1) — the marks' layers are placed by layout, which a browser snaps to its device pixel grid when it paints, not by a script-set translate rounded the same way, which it does not snap",
+      "expect": "survive",
+      "why": "the unit tests read each layer's effective offset (its left or top plus any translate), which a rounded translate gives exactly as layout does; jsdom paints nothing. Measured on 2026-10-16 (record 04, section 11.3): with this mutant ruler-paint-check.mjs sees 226 of 3,078 ticks smeared in WebKit at 1.25 (27 of 30 layouts) and 121 of 3,078 at 1.5 (24 of 30), against 0 of 27,093 ticks in 265 scenarios without it; Chromium and the integer ratios paint the same either way",
+      "browser": {
+        "harness": "scripts/ruler-paint-check.mjs",
+        "scenarios": [
+          "webkit@1.25/fit-1280x800-48x36",
+          "webkit@1.25/fit-1440x900-24x36",
+          "webkit@1.5/fit-1280x800-36x48"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "    if (topMarksRef.current) topMarksRef.current.style.left = `${snap(at.barX + at.x) - at.barX}px`;\n    if (leftMarksRef.current) leftMarksRef.current.style.top = `${snap(at.barY + at.y) - at.barY}px`;\n",
+          "    if (topMarksRef.current) topMarksRef.current.style.transform = `translateX(${snap(at.barX + at.x) - at.barX}px)`;\n    if (leftMarksRef.current) leftMarksRef.current.style.transform = `translateY(${snap(at.barY + at.y) - at.barY}px)`;\n"
+        ]
+      ]
+    },
+    "covers-y-ignored": {
+      "undoes": "C (second step 10 review, R1-F5) — the left ruler's reach is checked too, so a canvas that grows in height alone has marks to its ends",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "  return x.from <= -at.x && at.width - at.x <= x.to && y.from <= -at.y && at.height - at.y <= y.to;",
+          "  return x.from <= -at.x && at.width - at.x <= x.to && (y.from <= -at.y || true) && (at.height - at.y <= y.to || true);"
+        ]
+      ]
+    },
+    "covers-start-ignored": {
+      "undoes": "C (second step 10 review, R1-F5) — the bars' start ends are checked too, so a sheet that re-centres far has marks back to the bars' start",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "  return x.from <= -at.x && at.width - at.x <= x.to && y.from <= -at.y && at.height - at.y <= y.to;",
+          "  return (x.from <= -at.x || true) && at.width - at.x <= x.to && (y.from <= -at.y || true) && at.height - at.y <= y.to;"
+        ]
+      ]
+    },
+    "covers-y-start-ignored": {
+      "undoes": "C (the follow-up review, R1G-F3) — the left ruler's start end is checked on its own, so a sheet that a shorter poster moves far down has marks back to the bar's start",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "  return x.from <= -at.x && at.width - at.x <= x.to && y.from <= -at.y && at.height - at.y <= y.to;",
+          "  return x.from <= -at.x && at.width - at.x <= x.to && (y.from <= -at.y || true) && at.height - at.y <= y.to;"
+        ]
+      ]
+    },
+    "covers-y-end-ignored": {
+      "undoes": "C (the follow-up review, R1G-F3) — the left ruler's far end is checked on its own, so a sheet that a taller poster moves far up has marks to the bar's far end",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "  return x.from <= -at.x && at.width - at.x <= x.to && y.from <= -at.y && at.height - at.y <= y.to;",
+          "  return x.from <= -at.x && at.width - at.x <= x.to && y.from <= -at.y && (at.height - at.y <= y.to || true);"
+        ]
+      ]
+    },
+    "zoom-read-passive": {
+      "undoes": "C — the re-read after a zoom or gutter change runs in a layout effect, before the frame is painted",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "  useLayoutEffect(() => {\n    read(true);\n  }, [read, zoom, gutterX, gutterY]);",
+          "  useEffect(() => {\n    read(true);\n  }, [read, zoom, gutterX, gutterY]);"
+        ]
+      ],
+      "expect": "survive",
+      "why": "jsdom renders no frames, so an effect that runs after paint is not told apart from one that runs before it",
+      "unguarded": "Looks equivalent in Chromium (the second step 10 review's critic's per-frame probe, 2026-09-30, samples taken after the rulers' own observer and at each frame): 0 painted-stale samples on Zoom in x5, Zoom out x4, Fit and two window resizes, and on Hide and Show sidebar; its positive control (the reading taken after paint) went red on Hide and Show sidebar, up to 139.7 px. The zoom commits synchronously inside the click or resize event. Firefox and WebKit not run. Again on 2026-10-16 (record 04, section 11.5): with it served, `ruler-check.mjs --frames` on the six frames-matrix scenarios (Zoom in, Zoom out, Fit, a pinch, a wheel, the window resized, the sidebar toggled, Preview left, a size change, at 1024, 1280 and 1920 px with the sidebar shown and hidden) reads 0 of 66 events stale in Chromium: no input found that shows it"
+    },
+    "onpage-passive": {
+      "undoes": "C — which marks are on the page is recorded in a layout effect, before any observer can read it",
+      "edits": [
+        [
+          "src/poster/WorkspaceRulers.tsx",
+          "  useLayoutEffect(() => {\n    onPage.current = drawn;\n  }, [drawn]);",
+          "  useEffect(() => {\n    onPage.current = drawn;\n  }, [drawn]);"
+        ]
+      ],
+      "expect": "survive",
+      "why": "jsdom renders no frames, so an effect that runs after paint is not told apart from one that runs before it",
+      "unguarded": "Looks equivalent in Chromium (record 04, section 11.5, 2026-10-16): with it served, `ruler-check.mjs --frames` on the six frames-matrix scenarios reads 0 of 66 events stale, over 3,151 frames. A stale record could skip a flush that a scroll or a resize needs; no input found that shows it, and nothing committed would see it if one exists (the second step 10 review's critic, C9). Firefox and WebKit not run"
+    }
+  }
+}

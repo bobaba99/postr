@@ -203,7 +203,7 @@ Owner direction (Gavin, 2026-10-07): copy PowerPoint's controls and layout so th
 | Snap to a grid | MVP (invisible) | Keep it on with no settings. |
 | Bring to Front / Send to Back (right-click) | MVP | Figures and text boxes do overlap. |
 | Group / Ungroup | Optional | It helps to move a figure together with its caption, but captions may already be part of the block. |
-| Grid and Guides dialog, visible gridlines, rulers | Skip | Rulers are already parked (memory index: item 4 hidden). |
+| Grid and Guides dialog, visible gridlines, rulers | Skip | The Grid and Guides dialog and gridlines are skipped; the rulers were parked then (item 4 hidden) and are shown again since 2026-10-16 (fix 04, inch rulers only, no guides). |
 | Selection Pane | Skip | |
 
 **Postr today**: `INSPECTED poster/snap.ts:9-16` and `poster/constants.ts:60-63` snap to a 0.5 in grid within a threshold of 0.3 in. `INSPECTED poster/blocks.tsx:2723-2729`: the block menu offers Bring Forward and Send Back, one step each. PowerPoint's top-level items are Bring to *Front* and Send to *Back*, with the one-step versions inside the flyout. `poster/GroupFrame.tsx` and `poster/selectionLayout.ts` exist, but I did not read them, so whether smart guides, align and group exist is UNVERIFIED.

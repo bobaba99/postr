@@ -90,7 +90,7 @@ The poster has 9 block kinds: `title`, `authors`, `heading`, `text`, `image`, `l
 | 3.11 | Delete a block | Delete or Backspace; the red button on the handle row; the right-click "Delete". The credit mark refuses | `poster/PosterEditor.tsx:2217-2226`; `poster/blocks.tsx:2591, 2728` | Shown | — | CORE |
 | 3.12 | Align and distribute | **None.** A search for align or distribute and group or ungroup found no block-level controls | — | — | — | GAP (PowerPoint: Arrange › Align [PPT knowledge]) |
 | 3.13 | Show grid | A checkbox. The grid is a visual aid and never prints | `poster/Sidebar.tsx:1087-1096`; `poster/PosterEditor.tsx:748, 2873-3000` | Deep (bottom of the Layout tab) | 1 | ADJUST |
-| 3.14 | Rulers | Turned off (`RULERS_ENABLED = false`). Neither the toggle nor the rulers render | `config/features.ts:67`; `poster/Sidebar.tsx:1098-1107`; `poster/PosterEditor.tsx:747, 3288` | Flag | — | HIDDEN |
+| 3.14 | Rulers | Turned off (`RULERS_ENABLED = false`). Neither the toggle nor the rulers render. *Since 2026-10-16 (fix 04, after this inventory): shown again, `RULERS_ENABLED = true`; record `docs/fixes/04-rulers-match-sheet.md`* | `config/features.ts:67`; `poster/Sidebar.tsx:1098-1107`; `poster/PosterEditor.tsx:747, 3288` | Flag | — | HIDDEN |
 | 3.15 | Zoom | Buttons: −, a % readout (fits on click), +, FIT. Pinch and Ctrl+wheel also zoom | `poster/PosterEditor.tsx:615, 3560-3650` | Shown | 4 | CORE (navigation) |
 | 3.16 | Show / hide the sidebar | ⌘/; a "Hide sidebar" button; a "Show sidebar" tab | `poster/PosterEditor.tsx:988-991, 2733-2734`; `poster/Sidebar.tsx:466-467` | Shown | — | navigation |
 | 3.17 | Layout (Auto-Arrange, templates) | See 1.8 and 1.9 | | | | BULK |
@@ -154,7 +154,7 @@ Font size and color can each be set in several places:
 | Control | Switch | Where |
 |---|---|---|
 | Comments tab, "Comment on selection", area comments, share link | `SHARING_ENABLED = false` | `config/features.ts:53`; `poster/Sidebar.tsx:644, 820`; `poster/FloatingFormatToolbar.tsx:377` |
-| Rulers and their toggle | `RULERS_ENABLED = false` | 3.14 |
+| Rulers and their toggle | `RULERS_ENABLED = false` (shown again since 2026-10-16, fix 04) | 3.14 |
 | LaTeX export | `LATEX_EXPORT_ENABLED = false` | 7.3 |
 | Publish to gallery | `GALLERY_PUBLIC_ENABLED = false` | 7.6 |
 | Review tab (Presentation Checker) | commented out | `poster/Sidebar.tsx:7-12, 642, 811-816` |
