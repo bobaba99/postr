@@ -96,6 +96,7 @@ import {
   PHONE_GUTTER, WORKSPACE_GUTTER, ZOOM_STEP, clampZoom, fitSheet, type SheetFit,
 } from './workspaceGeometry';
 import { snap } from './snap';
+import { WorkspaceRulers } from './WorkspaceRulers';
 import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
 import { buildPrintDocument } from '@/export/printDocument';
 import { stripEditorChrome } from '@/export/stripEditorChrome';
@@ -747,8 +748,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     [showToast],
   );
 
-  // Scroll position for ruler rendering — updated on scroll events.
-  const [scrollPos, setScrollPos] = useState({ x: 0, y: 0 });
+  // The canvas's scroll position, kept for the re-render it causes: that
+  // keeps the text editor's focus hint (a fixed-position note placed during
+  // render) on its block (fix 04, measured: 60 px adrift without it). The
+  // rulers read the scroll themselves, before the frame is painted.
+  const [, setScrollPos] = useState({ x: 0, y: 0 });
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
@@ -2361,11 +2365,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     }
     finishBlockSelections(canvas);
 
-    // Deep-clone and strip the editor's chrome: the grid and ruler
-    // overlays, and a selected block's handles, handle row and accent
-    // border (a block just inserted is selected, and clicking the Export
-    // tab does not deselect it; fix 13c review Q-R5). Marked with data
-    // attributes, so user-added SVG content inside blocks is untouched.
+    // Deep-clone and strip the editor's chrome: the in-sheet grid and comment
+    // overlays (the rulers sit outside #poster-canvas), and a selected block's
+    // handles, handle row and accent border (a block just inserted is selected,
+    // and the Export tab does not deselect it; fix 13c review Q-R5). Marked by
+    // data attributes, so user-added SVG content inside blocks is untouched.
     const clone = canvas.cloneNode(true) as HTMLElement;
     stripEditorChrome(clone);
     // Reset the editor's zoom-slider transform on the clone itself: the
@@ -2406,7 +2410,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       data-comment-mode={sidebarTab === 'comments' ? 'true' : undefined}
       // Preview HIDES this tree; it must never unmount it. `printPoster`
       // clones `#poster-canvas` from the live DOM, and the pinch/wheel
-      // listener plus three ResizeObservers all capture `canvasRef.current`
+      // listener plus four ResizeObservers (three here, one in
+      // WorkspaceRulers) all capture `canvasRef.current`
       // with only `[canvasRef]` in their deps — a stable ref object, so a
       // remount would strand every one of them on a detached node. See
       // PosterPreviewOverlay's header for the full account.
@@ -3320,101 +3325,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         </div>
       </div>
 
-        {/* Workspace rulers — fixed at viewport edges, Figma-style.
-            Positioned absolutely over the scroll container so they
-            stay visible during scroll/zoom. */}
-        {showRulerEffective && (() => {
-          // Continuous rulers — compute which inch marks are visible
-          // based on scroll position, then render only those ticks.
-          const inchPx = PX * zoom; // pixels per inch at current zoom
-          // Canvas origin in scroll-container space: the workarea's
-          // padding, less the scroll. Right only on an axis the sheet
-          // fills; on the axis where it is centred, and for the 24 px
-          // ruler bar, the marks are off (plan item 4).
-          const canvasOriginX = gutterX - scrollPos.x;
-          const canvasOriginY = gutterY - scrollPos.y;
-          // Visible range in inches (extend past viewport edges)
-          const viewW = canvasRef.current?.clientWidth ?? 2000;
-          const viewH = canvasRef.current?.clientHeight ?? 1200;
-          const startInchH = Math.floor(-canvasOriginX / inchPx) - 1;
-          const endInchH = Math.ceil((viewW - canvasOriginX) / inchPx) + 1;
-          const startInchV = Math.floor(-canvasOriginY / inchPx) - 1;
-          const endInchV = Math.ceil((viewH - canvasOriginY) / inchPx) + 1;
-
-          const rulerTick = (pos: number, inch: number, major: boolean) => ({
-            pos: canvasOriginX + inch * inchPx,
-            inch,
-            major,
-          });
-
-          return (
-            <>
-              {/* Top ruler bar */}
-              <div style={{
-                position: 'absolute', top: 0, left: 24, right: 0, height: 24,
-                background: '#12121e', borderBottom: '1px solid rgba(255,255,255,0.08)',
-                overflow: 'hidden', pointerEvents: 'none', zIndex: 12,
-              }}>
-                {Array.from({ length: endInchH - startInchH }, (_, i) => {
-                  const inch = startInchH + i;
-                  const x = canvasOriginX + inch * inchPx;
-                  if (x < -inchPx || x > viewW + inchPx) return null;
-                  const isMajor = inch % 5 === 0;
-                  return (
-                    <div key={inch} style={{ position: 'absolute', left: x, bottom: 0 }}>
-                      <div style={{ width: 1, height: isMajor ? 12 : inch % 1 === 0 ? 7 : 4, background: 'rgba(255,255,255,0.35)' }} />
-                      {isMajor && (
-                        <span style={{
-                          position: 'absolute', left: 3, bottom: 12,
-                          fontSize: 9, color: 'rgba(255,255,255,0.45)',
-                          fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap',
-                        }}>
-                          {inch}"
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Left ruler bar */}
-              <div style={{
-                position: 'absolute', top: 24, left: 0, bottom: 0, width: 24,
-                background: '#12121e', borderRight: '1px solid rgba(255,255,255,0.08)',
-                overflow: 'hidden', pointerEvents: 'none', zIndex: 12,
-              }}>
-                {Array.from({ length: endInchV - startInchV }, (_, i) => {
-                  const inch = startInchV + i;
-                  const y = canvasOriginY + inch * inchPx;
-                  if (y < -inchPx || y > viewH + inchPx) return null;
-                  const isMajor = inch % 5 === 0;
-                  return (
-                    <div key={inch} style={{ position: 'absolute', top: y, left: 0 }}>
-                      <div style={{ height: 1, width: isMajor ? 12 : 7, background: 'rgba(255,255,255,0.35)' }} />
-                      {isMajor && (
-                        <span style={{
-                          position: 'absolute', top: 3, left: 12,
-                          fontSize: 9, color: 'rgba(255,255,255,0.45)',
-                          fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap',
-                          writingMode: 'vertical-lr',
-                        }}>
-                          {inch}"
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Corner square */}
-              <div style={{
-                position: 'absolute', top: 0, left: 0, width: 24, height: 24,
-                background: '#12121e',
-                borderRight: '1px solid rgba(255,255,255,0.08)',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
-                zIndex: 13, pointerEvents: 'none',
-              }} />
-            </>
-          );
-        })()}
+        {/* Workspace rulers — fixed at the canvas's edges, Figma-style. */}
+        {showRulerEffective && (
+          <WorkspaceRulers canvasRef={canvasRef} zoom={zoom} gutterX={gutterX} gutterY={gutterY} />
+        )}
 
         <UndoToast
           key={undoToast?.seq ?? 0}

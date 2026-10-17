@@ -1,9 +1,12 @@
 /**
  * The editor workspace's geometry: the gutter around the poster sheet and
- * the fitted zoom. The fit, the workarea's padding and the rulers all read
- * it from here. They used to hold three copies of the gutter, which drifted
- * apart (60 px in the fit against 96 in the padding), so "Fit" left the
- * sheet's far edge 36 px out of view (docs/fixes/03-fit-whole-sheet.md).
+ * the fitted zoom. The fit and the workarea's padding read it from here.
+ * They used to hold separate copies of the gutter, which drifted apart
+ * (60 px in the fit against 96 in the padding), so "Fit" left the sheet's
+ * far edge 36 px out of view (docs/fixes/03-fit-whole-sheet.md). The rulers
+ * no longer place their marks from the gutter: they read where the sheet is
+ * laid out, again whenever the gutter changes (WorkspaceRulers.tsx,
+ * docs/fixes/04-rulers-match-sheet.md).
  */
 
 /**

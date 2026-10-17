@@ -1130,7 +1130,7 @@ export function LayoutTab(props: {
         Show grid
       </label>
       )}
-      {/* The rulers are hidden for now (RULERS_ENABLED, config/features.ts). */}
+      {/* The rulers' toggle, behind RULERS_ENABLED (config/features.ts; shown since 2026-10-16, fix 04). */}
       {RULERS_ENABLED && (
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer', marginTop: 4 }}>
           <input

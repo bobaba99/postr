@@ -81,8 +81,9 @@ export async function capturePosterJpeg(opts: {
 
     // Strip editor-only chrome from the clone so the captured image
     // looks like the printed poster, not the live edit surface: a selected
-    // block's resize handles, handle row and accent border, the grid and
-    // the rulers (shared with "⎙ Save PDF").
+    // block's resize handles, handle row and accent border, and the grid
+    // (shared with "⎙ Save PDF"). The rulers sit outside #poster-canvas, so
+    // the clone never holds them (fix 04).
     stripEditorChrome(clone);
 
     const wrapper = document.createElement('div');

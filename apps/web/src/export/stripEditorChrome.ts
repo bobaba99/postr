@@ -5,7 +5,7 @@
  *
  * Shared by the thumbnail capture (data/thumbnails.ts) and "⎙ Save PDF"
  * (PosterEditor's printPoster). The print path used to strip only the
- * grid and ruler overlays, so a selected block (and a block just inserted
+ * grid overlay, so a selected block (and a block just inserted
  * is selected; clicking the Export tab does not deselect it) printed with
  * its resize handles, its handle row and its accent border (fix 13c review
  * finding Q-R5).
@@ -28,7 +28,9 @@
  *   - resizeHandles.tsx → [data-postr-resize-handle]
  *   - blocks.tsx top handle row, GroupFrame, SelectionRect, CropOverlay,
  *     FigureSizeOverlay → [data-postr-selection-ui]
- *   - the grid / ruler overlays → [data-postr-overlay]
+ *   - the in-sheet grid and the comment overlays → [data-postr-overlay]
+ *     (the workspace rulers sit outside #poster-canvas, so a copy of the
+ *     sheet never holds them; fix 04)
  *   - a block's own editing controls, inside its content: the table's row
  *     and column strips, column grips, hover "+" bars and active-cell
  *     bands (blocks.tsx TableBlock) → [data-postr-editor-ui]. ⌘P copies

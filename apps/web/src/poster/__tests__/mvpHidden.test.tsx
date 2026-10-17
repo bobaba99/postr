@@ -135,7 +135,10 @@ describe('the adjustments are hidden (ADJUSTMENTS_ENABLED, D4)', () => {
     await tab(/^layout$/);
     expect(sideLabels(/Show grid/)).toEqual([]);
     expect(document.querySelector('[data-postr-overlay="grid"]')).toBeNull();
-    expect(sideText()).not.toMatch(/visual aid/i);
+    // The overlays section keeps the rulers' toggle (fix 04 showed them
+    // again), so its line names one aid, not two.
+    expect(sideText()).not.toMatch(/Visual aids only/);
+    expect(sideText()).toMatch(/A visual aid only — it never prints or exports\./);
   });
 
   it('the style tab keeps palette, font and the four sizes, and nothing else', async () => {
