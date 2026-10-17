@@ -10,6 +10,7 @@
  * Record: docs/fixes/12-one-undo-history.md, section 11 (the merge review's
  * F1: a crop drag was one step per pointer move).
  */
+import type { Block } from '@postr/shared';
 import { beginDragStep, endDragStep } from '@/stores/posterStore';
 
 /**
@@ -42,4 +43,23 @@ export function holdDragStep(e?: { button?: number }): void {
   window.addEventListener('pointercancel', end, true);
   window.addEventListener('contextmenu', onMenu, true);
   window.addEventListener('blur', end);
+}
+
+/**
+ * A move, resize or rotate drag's undo step (`useBlockDrag`): the blocks as
+ * they are at release (`now`), each with its place, size and rotation from
+ * pointerdown (`before`), the only fields such a drag changes. Not the list
+ * captured at pointerdown: a change made silently while the pointer was down
+ * stays out of the drag's step (record 35, review round 3, R3-3's sibling: a
+ * pasted image's own file landing mid-drag was put back to its source by the
+ * drag's ⌘Z, MEASURED). A block not in `before` is left as it is.
+ */
+export function atPreDragGeometry(now: readonly Block[], before: readonly Block[]): Block[] {
+  const pre = new Map(before.map((b) => [b.id, b]));
+  return now.map((b) => {
+    const p = pre.get(b.id);
+    if (!p || (p.x === b.x && p.y === b.y && p.w === b.w && p.h === b.h && p.rotation === b.rotation)) return b;
+    const { rotation: _rotation, ...rest } = b;
+    return { ...rest, x: p.x, y: p.y, w: p.w, h: p.h, ...(p.rotation !== undefined ? { rotation: p.rotation } : {}) };
+  });
 }

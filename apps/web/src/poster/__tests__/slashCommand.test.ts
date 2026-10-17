@@ -5,7 +5,7 @@
  * apart on edge cases (empty prefix, mid-string insertion, etc).
  */
 import { describe, it, expect } from 'vitest';
-import { applySymbolInsertion, matchSlashAtCaret } from '../slashCommand';
+import { applySymbolInsertion, matchSlashAtCaret, textBeforeCaretByLine } from '../slashCommand';
 
 describe('matchSlashAtCaret', () => {
   it('matches /alpha at end of text', () => {
@@ -42,6 +42,67 @@ describe('matchSlashAtCaret', () => {
     // `/al-` has a hyphen which breaks the token, so only `` matches
     // after the hyphen → no match.
     expect(matchSlashAtCaret('/al-')).toBeNull();
+  });
+});
+
+describe('matchSlashAtCaret: "/" only at the start of a word (record 39, rule T4)', () => {
+  it.each(['n/a', 'mg/kg', 'w/', 'μg/d', 'see Fig. 2/', 'and/or', '24/7', 'km/h', 'x/'])('"%s": a slash inside a word, no match', (t) => {
+    expect(matchSlashAtCaret(t)).toBeNull();
+  });
+
+  it.each([
+    ['after a space', 'p = /al', 'al'],
+    ['after a no-break space', 'p\u00a0/al', 'al'],
+    ['after a line break', 'line one\n/al', 'al'],
+    ['after a tab', 'x\t/', ''],
+    ['at the start', '/al', 'al'],
+  ])('%s: a match', (_what, t, prefix) => {
+    expect(matchSlashAtCaret(t)?.prefix).toBe(prefix);
+    expect(matchSlashAtCaret(t)?.literal).toBe(`/${prefix}`);
+  });
+});
+
+describe('textBeforeCaretByLine', () => {
+  const caretIn = (html: string) => {
+    const root = document.createElement('div');
+    root.innerHTML = html;
+    document.body.replaceChildren(root);
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let last: Text | null = null;
+    for (let n = w.nextNode() as Text | null; n; n = w.nextNode() as Text | null) last = n;
+    const r = document.createRange();
+    if (last) r.setStart(last, last.data.length);
+    else r.selectNodeContents(root);
+    r.collapse(true);
+    getSelection()!.removeAllRanges();
+    getSelection()!.addRange(r);
+    return root;
+  };
+
+  it('a <br> is a line break', () => {
+    expect(textBeforeCaretByLine(caretIn('one<br>/al'))).toBe('one\n/al');
+  });
+
+  it('a line the browser put in a <div> (Chromium\'s and WebKit\'s Enter) starts with a line break', () => {
+    expect(textBeforeCaretByLine(caretIn('one<div>/al</div>'))).toBe('one\n/al');
+    expect(textBeforeCaretByLine(caretIn('<div>one</div><div>/al</div>'))).toBe('one\n/al');
+  });
+
+  it('a list item starts a line', () => {
+    expect(textBeforeCaretByLine(caretIn('<ul><li>one</li><li>/al</li></ul>'))).toBe('one\n/al');
+  });
+
+  it('inline markup is text: "x<b>/al</b>" is inside a word', () => {
+    const t = textBeforeCaretByLine(caretIn('x<b>/al</b>'))!;
+    expect(t).toBe('x/al');
+    expect(matchSlashAtCaret(t)).toBeNull();
+  });
+
+  it('no selection in the root: null', () => {
+    const root = caretIn('one');
+    const other = document.createElement('div');
+    expect(textBeforeCaretByLine(other)).toBeNull();
+    void root;
   });
 });
 

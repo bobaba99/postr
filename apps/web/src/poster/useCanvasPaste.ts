@@ -3,7 +3,8 @@
  * listeners for the rule table in canvasPaste.ts.
  *
  * - ⌘V / Ctrl+V with nothing in edit mode (table B): a document `paste`
- *   listener. A paste whose target or focused element is a field, a menu
+ *   listener. Order 1, Postr's copied blocks, goes to `pasteBlocks`
+ *   (record 35, useBlockClipboard.ts). A paste whose target or focused element is a field, a menu
  *   or editable text is the field's own (`isEditing`); nothing happens
  *   while a table shows cells selected by dragging (`cellRangeShown`), a
  *   dialog is open, or the editor is read-only or previewing.
@@ -29,6 +30,7 @@ import {
   cellRangeShown, centredIn, dropPositions, filesOf, insertSize, isEditing, nextTo, readCanvasPaste, tableFromRows,
   type Box, type Size,
 } from './canvasPaste';
+import type { ClipPayload } from './blockClipboard';
 import { imageBlockSize, imageFileProblem, putFileIntoImageBlock, readImageSize, storeImageFile } from './imageFile';
 
 export interface CanvasPasteOptions {
@@ -47,6 +49,8 @@ export interface CanvasPasteOptions {
   posterId: string | null | undefined;
   /** Put new blocks into the poster as one undo step and select them. */
   commit: (blocks: Block[]) => void;
+  /** Table B's order 1: paste Postr's copied blocks (record 35, useBlockClipboard.ts); null when the payload failed validation. */
+  pasteBlocks: (payload: ClipPayload | null) => void;
 }
 
 /** A new block of a type, at a place, of a size. */
@@ -116,6 +120,10 @@ export function useCanvasPaste(opts: CanvasPasteOptions) {
       const what = readCanvasPaste(e.clipboardData);
       if (!what) return;
       e.preventDefault();
+      if (what.kind === 'blocks') {
+        o.pasteBlocks(what.payload);
+        return;
+      }
       const view = viewOfSheet();
       if (what.kind === 'table' || what.kind === 'text') {
         const size = insertSize(what.kind);

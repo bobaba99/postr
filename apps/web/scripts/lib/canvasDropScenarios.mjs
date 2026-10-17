@@ -15,7 +15,7 @@ import { until } from './canvasPasteKit.mjs';
 import { pinchTo } from './selectionControls.mjs';
 import {
   IMAGES, PDF_FILE, addedBlocks, bigPng, handOver, drawnBlock, dropFiles, emptySheetPoint, eventCount, eventsSince, fileOf, othersChanged,
-  paintShare, renamed, settledChange, sheetUnits, storedBlocks, storedEquals, toUnits, uploadsOf, waitPaint,
+  keyedName, paintShare, renamed, settledChange, sheetUnits, storedBlocks, storedEquals, toUnits, uploadsOf, waitPaint,
 } from './canvasPasteKit.mjs';
 import { fillViaChooser, judgeCreate, openSession, storeFirst } from './canvasPasteScenarios.mjs';
 
@@ -107,7 +107,7 @@ async function runDropOnImage(h, s, sc) {
   const added = addedBlocks(before, after);
   if (added.length) p.push(`${added.length} blocks added`);
   const ext = sc.file.name.split('.').pop();
-  if (!new RegExp(`^storage://${s.uid}/${s.id}/${img.id}\\.${ext}$`).test(blk?.imageSrc ?? '')) p.push(`imageSrc ${String(blk?.imageSrc).slice(0, 80)}`);
+  if (!new RegExp(`^storage://${s.uid}/${s.id}/${keyedName(img.id, ext)}$`).test(blk?.imageSrc ?? '')) p.push(`imageSrc ${String(blk?.imageSrc).slice(0, 80)}`);
   const ups = uploadsOf(s.state, img.id, since);
   if (ups.length !== 1) p.push(`${ups.length} uploads keyed by it`);
   const aspect = IMAGES.B.w / IMAGES.B.h;

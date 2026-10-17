@@ -7,7 +7,8 @@
  * - The checks are the upload's: an image type, under 10 MB, with the
  *   messages users already saw (they lived in blocks.tsx `readImageFile`).
  * - The file is stored through `uploadPosterImage`
- *   ({user}/{poster}/{block}.{ext}, `storage://`); with no owner known, or
+ *   ({user}/{poster}/{block}-{random}.{ext}, a new name each time since
+ *   record 35, `storage://`); with no owner known, or
  *   when the upload fails, it is kept in the poster as a data URL, as the
  *   image block's upload has always done.
  * - The block takes the image's shape: an image block's height is its
