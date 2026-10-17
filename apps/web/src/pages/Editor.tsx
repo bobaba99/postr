@@ -51,33 +51,32 @@ function hydrateIfEmpty(doc: PosterDoc): PosterDoc {
 }
 
 /**
- * Print-readability sanity limits for each style level, in poster
- * units (1 unit = 7.2 points). Anything above these clearly violates
- * the guideline — older documents written before the calibration fix
- * saved sizes like title:60 / heading:28 / body:18, which rendered as
- * 432pt / 202pt / 130pt and crammed the layout. If we detect any
- * level above its ceiling, we replace JUST that level with the
- * default — preserving user-tweaked colors, weights, and italics on
- * any level that's already within the sane range.
- *
- * Ceilings are deliberately generous so users can still crank a
- * title to ~200pt if they want; only clearly-broken old defaults
- * get replaced.
+ * The four type sizes, in poster units (1 unit = 7.2 points), that every
+ * poster stored before the typography calibration was created with: the
+ * posters table's first default for `data` (the posters migration as first
+ * written, 853ec1c; rewritten in place by 979df80 on 2026-04-09), drawn at
+ * 432 / 201.6 / 158.4 / 129.6 pt. The client never wrote its own
+ * pre-calibration sizes into a poster (docs/fixes/37-load-size-cap.md §6).
  */
-const STYLE_SIZE_CEILING_UNITS: Record<keyof Styles, number> = {
-  title: 30, // ~216pt
-  heading: 14, // ~100pt
-  authors: 10, // ~72pt
-  body: 10, // ~72pt
-};
+const PRE_CALIBRATION_SIZES: Record<keyof Styles, number> = { title: 60, heading: 28, authors: 22, body: 18 };
+const LEVELS: Array<keyof Styles> = ['title', 'heading', 'authors', 'body'];
 
+/**
+ * A poster stored before the calibration is recognised by those sizes, all
+ * four of them, and opens at today's defaults; every other size is kept as
+ * stored, however large (the Style tab's fields and A+ reach sizes above the
+ * ceilings this used to apply, title 216, heading 100.8, authors and body
+ * 72 pt, which replaced a user's own sizes on every open: record 37). One
+ * level at its old value is not an old poster: the Style tab stores a title
+ * typed as 432 pt as exactly 60 units. A missing level gets today's default.
+ */
 function normalizeStaleStyles(doc: PosterDoc): PosterDoc {
-  const levels: Array<keyof Styles> = ['title', 'heading', 'authors', 'body'];
+  const preCalibration = LEVELS.every((level) => doc.styles[level]?.size === PRE_CALIBRATION_SIZES[level]);
   let mutated = false;
   const next: Styles = { ...doc.styles };
-  for (const level of levels) {
+  for (const level of LEVELS) {
     const current: TypeStyle | undefined = doc.styles[level];
-    if (!current || current.size > STYLE_SIZE_CEILING_UNITS[level]) {
+    if (preCalibration || !current) {
       next[level] = DEFAULT_STYLES[level];
       mutated = true;
     }
@@ -266,9 +265,10 @@ export default function Editor() {
           return;
         }
         openedRef.current = { posterId: row.id, userId };
-        // normalizeStaleStyles runs first so that docs saved before
-        // the typography calibration fix (title:60, heading:28, etc.)
-        // self-heal on load without needing a db reset.
+        // normalizeStaleStyles runs first so that a poster stored before
+        // the typography calibration (all four sizes the old default's:
+        // title 60, heading 28, authors 22, body 18 units) opens at today's
+        // sizes without a db reset; any other size opens as stored.
         const raw = row.data as PosterDoc;
         const hydrated = hydrateIfEmpty(normalizeSheetSize(normalizeStaleStyles(raw), row));
         // Seeding is opt-in and belongs to the EDITING entry point only.
