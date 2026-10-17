@@ -55,13 +55,8 @@
       ]
     },
     "shortcut-guard-counts-closing": {
-      "undoes": "the shortcut guard ignores a dialog that is fading out (⌘Z right after confirming works; since fix 12 ⌘Z's guard is editorHistory.ts's)",
+      "undoes": "the shortcut guard ignores a dialog that is fading out (⌘Z right after confirming works; since fix 12 ⌘Z's guard is editorHistory.ts's, and since record 36's review (R36-4) the editor's other shortcuts read the same test, PosterEditor's modalDialogOpen calling dialogOpen)",
       "edits": [
-        [
-          "src/poster/PosterEditor.tsx",
-          "'[role=\"dialog\"][aria-modal=\"true\"]:not([data-state=\"closing\"])'",
-          "'[role=\"dialog\"][aria-modal=\"true\"]'"
-        ],
         [
           "src/poster/editorHistory.ts",
           ".some((d) => d.getAttribute('data-state') !== 'closing')",
