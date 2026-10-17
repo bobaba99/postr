@@ -1310,7 +1310,7 @@ evidence label of each.
 Record `docs/fixes/34-paste-drop.md` section 10 has the detail and the
 evidence label of each.
 
-- **Undo after an image is replaced by a file of the same type** draws
+- ~~**Undo after an image is replaced by a file of the same type** draws
   the new image in the old box, and a reload gives the block its shape
   again (MEASURED, `canvas-paste-check.mjs` D-on-image, information):
   files are stored per block id and an upload overwrites (bounded-designs
@@ -1318,7 +1318,11 @@ evidence label of each.
   name per upload; it also covers Preview, the print window and an export
   drawing a cached old file after a same-type Replace in the same session
   (INSPECTED; on main Firefox and WebKit kept drawing the old picture on
-  the canvas too, I-replace-button).
+  the canvas too, I-replace-button).~~ **Answered by record 35**: every
+  upload writes a new name (`{block}-{random}.{ext}`); one ⌘Z after a
+  same-type Replace draws the old picture (MEASURED in three engines,
+  `C-replace-undo`, DU 0 of 1); Preview, print and export sign the new
+  path (INSPECTED).
 - **Nothing shows while a pasted or dropped image uploads** (the block
   appears once stored; MEASURED with the upload held 2.5 s, B3-slow).
   Raised by its review round (R34-4, MEASURED in three engines): a second
@@ -1350,6 +1354,116 @@ evidence label of each.
   Word's figure with its caption, Excel's picture of the cells, a file
   copied in the Finder or Explorer) and a real Firefox's image paste:
   UNVERIFIED; the manual flow §39 has the checks.
+
+### Queued by record 35 (block copy, cut and paste; image files, 2026-10-16)
+
+Record `docs/fixes/35-block-copy.md` section 10 has the detail and the
+evidence label of each.
+
+- **Files no block uses stay in storage**: one per Replace (MEASURED, 3 →
+  4 files in the poster's folder after one Replace), one per pasted copy
+  later deleted or undone. The orphan-files fix must NOT assume one file
+  per block: older ⌘D clones, a ⌘D clone whose copy failed (record 35
+  R1-3), a pasted image whose copy storage could not make just then,
+  which keeps its source's file, possibly in another poster's folder
+  (record 35 R3-1; also when the other poster is left or reloaded while
+  the copy is out, and a copy completing then is used by no block: the
+  final check's F35-FC-3, MEASURED with the checker's probe), a dashboard
+  Duplicate, saved versions and undoable states share files (since record
+  35 R3-3 a copy brought back by ⌘⇧Z, or by a ⌘Z of a step made while it
+  was copied, holds its own file; until then it shared its original's,
+  R2-1). A copy try whose answer was lost but which made its copy leaves
+  that copy unused (record 35 F35-FC-1, correction 4). Since record 35's
+  correction 5 a pasted image or a ⌘D clone whose copy storage refused for
+  a reason not about the file (a 403, an expired token, a 409, a 404 after
+  a busy try) also keeps sharing its source's file, possibly in another
+  poster's folder, until a later Replace gives it its own name (F35-FC-3's
+  shape). Files referenced by any poster's blocks or saved versions are
+  never deleted. Before deleting a file it must count the references to it
+  across all of the account's posters, saved versions and undoable states
+  (record 35 §9, R1-6). A deleted poster's folder is left as before.
+- ~~**A copy storage refuses for a reason not about the file empties a
+  pasted image showing the user's own file** (record 35's final check,
+  F35-FC-2, LOW, MEASURED with the checker's probe in Chromium and Firefox
+  against the fake storage: a 403, a 503 then 400 `InvalidJWT`, a 503 then
+  a 404 while the file is there; a figure cut in one poster and pasted in
+  another is then lost from both, nothing deleted), while ⌘D keeps its
+  original's file on the same failures. The lead's call on R3-1's rule:
+  for a source in the user's own folder, empty only when storage says the
+  source is not there (a 404 / `not_found`), else keep it as for a busy
+  copy; or sign the source once before emptying it.~~ **Answered by record
+  35's correction 5** (the lead's decision, the first option): for a pasted
+  image or a ⌘D clone whose source is in the user's own folder, the block
+  is emptied, with the "couldn't be copied" toast, only when storage's
+  first answer says the file does not exist (statusCode 404 with storage's
+  "not found"); every other refusal or failure keeps the source, with no
+  toast; another account's file or a source that is not a storage path is
+  unchanged (a pasted one empty, with the toast). MEASURED with the
+  folded-in `C-fc-` scenarios (record 35 §9). How often real storage
+  refuses a copy of the user's own existing file is still UNVERIFIED.
+- **The `.postr` import has no table bounds and no totals** (record 35
+  R1-1's sibling, INSPECTED): give it the paste's bounds (a table at most
+  500 rows, 50 columns, 2 500 cells; 2 500 cells in all). **No poster-size
+  cap exists** (the reviewer's grep): a poster made of many tables by hand,
+  or written by another route, is drawn and saved whatever its size.
+- **The browser's Edit › Copy and Edit › Cut menu items do not copy
+  blocks** (only ⌘C / ⌘X do; Edit › Paste pastes them): a document `copy`
+  / `cut` listener could serve both (record 35 R1-7, INSPECTED). A focused
+  slider or checkbox counts as edit mode for ⌘C (record 34's `isEditing`).
+- **A pasted, dropped or uploaded image still waits for its upload before
+  its step lands** (record 34's R34-4, MEASURED there: a ⌘Z pressed
+  meanwhile undoes the step before, which ⌘⇧Z cannot bring back). Record
+  35's review round 2 answered the same cause for copies (R2-1, MEASURED in
+  three engines: ⌘D's clone and ⌘V's copies now go in at once and take
+  their own files silently, `settleCopiedFiles`); an upload has no stored
+  path to show meanwhile, so it needs a placeholder that is never stored
+  (its preview), then the same silent fill.
+- **"My Logos" stores a signed address that expires after an hour** as the
+  logo's picture (`LogoPicker` `handleMyLogoClick` → `logo.signedUrl`;
+  INSPECTED, a defect on main found in passing): the logo would draw
+  nothing an hour later. Store the library file's path (or copy it into
+  the poster's folder) instead.
+- **Insert › Logo can select the locked credit mark** instead of adding a
+  logo, and **⌘D clones a user logo** (a second logo): the one-logo rule
+  lives in Insert's check, which does not skip locked blocks, and not in
+  ⌘D (bounded-designs §3.2; INSPECTED). The paste's rule (`blockClipboard.ts`
+  `admit`) already skips the mark and refuses a second logo; Insert and ⌘D
+  could read the same rule.
+- **A note, a caption and table cells are drawn as stored**
+  (`dangerouslySetInnerHTML`, `asIs`): every writer cleans them (the
+  editor, the `.postr` import, record 35's paste), but a row written by
+  another route would be drawn unsanitized (INSPECTED; sharing is hidden).
+  A render-time sanitizer for those fields.
+- **Repeated ⌘V of one copy** lands each set at the same +1 in (PowerPoint
+  offsets each paste further, `PPT?`).
+- **Charts are not copied** (hidden, D1): a chart's spec would need its own
+  validator before a pasted one reaches the Figure tab's R and Python code.
+- **The block payload's HTML carries each image's storage path** (with the
+  account's id) to any application that keeps HTML attributes: a plain
+  editable field with no paste handling of its own kept the attribute
+  (726 characters, holding the account id) in Chromium, Firefox and WebKit
+  (MEASURED, record 35 R2-4, `C-r2-i-other-apps`); whether Word, Docs or
+  Gmail keep it is UNVERIFIED; the bucket is private (INSPECTED). A
+  document that kept it and is copied back onto the canvas would paste the
+  original blocks, not the words (INSPECTED, UNVERIFIED in a real
+  application). Writing only what the paste needs is a design decision
+  (the full path is what lets a copy reach another poster).
+- **Another application's paste of copied blocks** (Word, Google Docs,
+  e-mail) and a real browser's copy event with nothing selected (Safari)
+  are UNVERIFIED; the manual flow §40 has the checks.
+- **"These blocks are too large to copy." for a block whose id fails the
+  payload's check** (record 35 R3-5, INSPECTED): Postr writes ids the
+  check accepts, but the `.postr` import keeps an imported id as written
+  (`sanitizeImportedBlock`), so ⌘C of such a block says it is too large.
+  Normalise the id when it is copied (the paste gives a new id anyway;
+  the +1 in test reads the original's id), or word that toast.
+- **`migrateBase64ToStorage` can drop edits made while it uploads**
+  (`pages/Editor.tsx`; record 35 review round 3, the reviewer's INSPECTED,
+  not measured, pre-existing): it sets blocks taken from the poster as it
+  was at load once its uploads finish, so on a poster that still holds
+  data-URL images an edit made meanwhile (a paste included) could be
+  lost. Apply its paths to the poster as it is then (as record 35's
+  `withCopiedFiles` does).
 
 ### Queued by record 33 (text size, 2026-10-10)
 
@@ -1655,3 +1769,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 32 (MVP: pasting tables; fix 27's N2-F1) | `fix/table-paste` | implemented; its one review round (a simple feature: the browser, through the user's entry points, on `tablepaste-frozen-1`) done and corrected (6 findings: R1-F1, R1-F2 and R1-F3 MEDIUM corrected, each reproduced first with the committed instrument in the three engines and then 0; R1-F4 LOW, the table tip corrected to say a single copied cell replaces the cell's text, the behaviour queued for the owner; R1-F5 LOW, two docs corrected; R1-F6 INFO queued; the corrector's audit of its own correction found it lost a Shift+Enter line and a double space copied between blocks in Firefox, MEASURED, and corrected it); the correction is for the next lead pass, frozen copy `tablepaste-frozen-2` — `docs/fixes/32-table-paste.md` (bounded-designs.md §3.3 A, the lead's rule table, PowerPoint's behaviour): one line of text pasted into a table cell goes in at the caret; a grid (an HTML table from Excel, Word or Sheets, or text with tabs or line breaks) fills the table from the focused cell, across and down, growing it by rows and columns, no cell outside the pasted area changed, nothing dropped (merged cells keep the cells after them in their columns), one undo step; a paste into a text block or the title takes the poster's style (the source's colour and highlight dropped with its font and size; a style sheet's text and Google Docs' non-bold `<b>` wrapper dropped); a pasted cell's text stored as text. Reproduced from the user's entry with a real ⌘C/⌘V in Chromium, Firefox and WebKit (`scripts/table-paste-check.mjs`, on main: rule 1 broken in 3 of 3 scenarios, the table replaced by the grid in 12 of 12 grid scenarios, wrong in 11 (the twelfth covers the whole table from its first cell), an `<img onerror>` pasted as text ran in 2 of 2, colour or a style sheet's text kept in 4 of 5 text pastes; after: 0 in each engine, and on the production build in Chromium); after the review round: Word's own bold kept (`<b style='mso-bidi-font-weight:normal'>`: the not-bold check read any "font-weight: normal" in the style, so Word's bold was dropped in text blocks, a regression against main, and in cells), blank lines at the end of a paste no rows and rule 1's line ending with no line break (a paragraph Chromium copied with a triple-click emptied the cell below; WebKit added a blank line), a line wrapped in the clipboard's HTML source one line in cells, text blocks and the title, while text copied between blocks keeps its line breaks and spaces; the instrument's 30 scenarios 0 in each engine and on the production build in Chromium; 54 of 54 mutants killed; the three in-app sentences about pasting tables say what the paste does; queued above: "Queued by record 32" |
 | 33 (MVP design §3.7, owner decision D2) | `fix/text-size` | implemented — `docs/fixes/33-text-size.md`; the first build's tree (on `1d5addf`) was lost before it was committed, and the build was recovered from the author's transcript onto `c67a3db` (record 33 §9: nothing re-implemented; byte-identical to the first build wherever a copy survived) with every number below measured again there; reproduced first in Chromium, Firefox and WebKit (`text-size-check.mjs`: no text-size control in the top bar; raising every level one step took the Style tab's 4 fields and 4 undo steps, the ratios drifting up to 1.01 % and a round trip ending the title at 101 pt from 100.8, MEASURED); built: [A−] Body 36 pt [A+] in the top bar between Redo and Save PDF (`poster/TextSizeControl.tsx`, rules `poster/textSize.ts`): the body steps through 28 · 32 · 36 · 40 · 44 · 48 pt, title, heading and authors keep their ratio, unrounded, every return to a size exact (`===`, from an anchor: the naive new ÷ old formula missed on 4526 of 4549 swept walks), one undo step per press, the caret kept on a mouse press, the focus kept and the selection's keys blocked on a keyboard press, disabled at the bounds with a title saying why; the Edit tab's note names it; Auto-Arrange still never changes a size; after: every claim clean in three engines (13 posters, 147 presses, 65 returns to a size all `===`; the print document and the PowerPoint file at the new sizes; the top bar without overlap at 1024 and 1280 px); 25 of 25 mutants killed, 3 blind spots guarded in the browser; a sibling found and queued for the lead and the owner (a level set large and raised with A+ past the editor's load-time ceilings is reset on the next open, older than record 33: the Style tab reaches it too, MEASURED); its one review round (a simple feature: the browser, through the user's entry points, on `textsize-frozen-1`) done and corrected (6 findings: R1-F1 MEDIUM, a body that is not a size, the Style tab's Body field cleared stores 0 and left A+ promising 28 pt and doing nothing, and R1-F5 LOW, a title stored as null written as 0 by a press, one cause, corrected: such a body counts as below every size, A+ sets it to 28 pt and leaves the other levels, the label reads "Body – pt", another level that is not a size is left alone; reproduced first with the folded-in scenarios, OBSERVED in Chromium, Firefox and WebKit, then clean; R1-F2 MEDIUM, one A+ from a body typed at 12 pt resets title, heading and authors on reopen, left to the lead and the owner, queued above with the record corrected; R1-F3 LOW, two round trips 1 to 2 units in the last place off, measured and queued; R1-F4 LOW, the label near a size, an owner call; R1-F6 INFO); after: 46 scenarios clean in each engine, 32 of 32 mutants killed, 3 blind spots guarded; the correction is for the next lead pass, frozen copy `textsize-frozen-2` |
 | 34 (MVP: paste and drop on the canvas) | `fix/paste-drop` | implemented and reviewed (one round, a simple feature: the browser, through the user's entry points, on `pastedrop-frozen-1`; 10 findings, 2 MEDIUM, 6 LOW, 2 INFO, record §9): corrected R34-1 (a second file put into an image block while the first uploads drew nothing until a reload: only the last file now updates the block), R34-2 (an image with an `<img>` fragment and its address as text pasted nothing: "text" is now what a paste into a text block would insert), R34-3 (a dragged cell range then ⌘V made a stray block in Chromium: the canvas waits) and R34-7 (a paste behind the feedback dialog made a block: the dialog is marked modal), each reproduced first in the browser in three engines and red first in a unit test; R34-4 and R34-6 queued below; after: the instrument green in Chromium, Firefox and WebKit, 50 of 50 mutants killed, 3 of 3 blind spots guarded; the correction is in the frozen copy `pastedrop-frozen-2` — `docs/fixes/34-paste-drop.md` (bounded-designs.md §3.3 table A row 3, table B orders 2 to 5, Drop, Image checks; order 1, Postr's own copied blocks, is the next fix): ⌘V with nothing in edit mode makes a table block from an HTML table (record 32's reader), an image block from an image with no text (or fills the selected empty image block), a text block from any other text (record 32's cleaned paste), nothing otherwise, centred in the part of the sheet in view, snapped to the ½ in grid; an image pasted into a text block, a heading or the title makes an image block to its right, or below it as drawn; image files dropped on the canvas make image blocks centred on the drop point, each next 1 in down and right, and one dropped on an image block goes into it; non-images and files over 10 MB skipped with today's messages; every paste or drop one undo step; a paste into a field or with a dialog open makes nothing; a guest the same. Reproduced first from the user's entry (`scripts/canvas-paste-check.mjs`, real ⌘V where the engine allows it, trusted drops in Chromium) on a clean tree of `c67a3db` in Chromium, Firefox and WebKit: nothing happened in any row (B2 2/2, B3 7/7, B3F 1/1, B4 4/4, A3 3/3, DR 3/3, DM 1/1, DI 3/3, G 2/2; Chromium fired no `drop` at all), and the image block's own upload took three undo steps, stored a `blob:` address while the upload was out and kept a broken figure for a file over 10 MB (UP, UPB, UPX, the path a fill and a drop share, fixed with it: one update after the file is stored); after: every claim 0 in each engine and on the production build in Chromium; 43 of 43 mutants killed, 5 of 5 blind spots guarded in the browser; §3.3 D measured and left to the next fix (⌘Z after a same-type replace draws the new image); queued above: "Queued by record 34" |
+| 35 (MVP: block copy, cut and paste; §3.3 D image files) | `fix/block-copy` | implemented, then corrected after review round 1 (stage "correction 1": 7 findings, 3 MEDIUM, 3 LOW, 1 INFO, each reproduced from the user's entry in three engines and corrected, record §9; the ⌘X rule for a picture that cannot travel, R1-2, was decided by the corrector and awaits the lead; then review rounds 2 and 3 and "correction 2" and "correction 3", below) — `docs/fixes/35-block-copy.md` (bounded-designs.md §3.3 table B order 1, table C, D): ⌘C / Ctrl+C with blocks selected and nothing in edit mode puts a versioned payload of the blocks (HTML with `data-postr-blocks`) and their words (plain text) on the system clipboard; ⌘X copies, then deletes as Delete does (the credit mark stays, with its toast); ⌘V pastes copies with new ids 1 in down and right of their originals while an original is on the poster, else at their places (another poster, another tab, after a reload or a cut), each kept on the sheet, in one undo step; a title, an authors block or a user logo the poster has is refused with a toast; the payload is validated strictly and cleaned (a payload that fails pastes nothing, with a toast); every upload and Replace writes a new file name, and ⌘D's clone and each pasted image get their own file (a storage copy); a pasted file storage refuses to copy (another account's, a missing one) gives an empty block and one toast, while ⌘D's clone keeps its original's file when its copy fails (R1-3) and, since review round 3, a pasted image keeps showing its own-folder source when storage is busy on every try (R3-1); charts are not copied. Reproduced first from the user's entry (`scripts/canvas-paste-check.mjs --only C-`: real ⌘C, ⌘X, ⌘V, ⌘D, Replace, a reload, another poster, a second tab, a guest) on a clean tree of `2b94b5a` in Chromium, Firefox and WebKit: ⌘C and ⌘X did nothing (C1 3/3, C2 2/2), ⌘V made a text block of the old clipboard's words (C3 5/5, C5 3/3, B1N 9/9), ⌘D's clone shared its original's file and a Replace overwrote it, so after a reload the clone drew the new picture (D 6/6, R 2/2, DR 1/1), and one ⌘Z after a same-type Replace drew the new picture (DU 1/1); after: every claim 0 in each engine (and record 32's, record 34's and record 12's instruments green on this tree; record 32's found a defect of the first version, a ⌘C taken from text the user had selected in the sidebar, corrected, record §9); 55 of 55 mutants killed; web suite, tsc and the production build pass. Review round 1's corrections: the payload's tables at most 2 500 cells together (R1-1); ⌘X leaves a picture ⌘V could not bring back, with a toast (R1-2); ⌘D's clone keeps its original's file when the copy fails, and older `{block}.{ext}` names copy (R1-3); ⌘C / ⌘X write only a payload ⌘V accepts, else nothing (R1-4); refusals judged again when the copies land (R1-5); the manual flow's logo step and the orphan-files sentence corrected (R1-6); the charts toast pluralised (R1-7). Review round 2 (an independent review from the user's entry points, on a copy of `blockcopy-frozen-1`) and its correction (stage "correction 2", record §9): 4 findings, 1 MEDIUM, 2 LOW, 1 INFO; R2-1 MEDIUM, reproduced with the folded-in `C-r2-` scenarios in three engines on the corrected tree (INFL 5 of 5 each: a ⌘Z pressed while storage copied a file undid the step before and ⌘⇧Z could not bring it back, two quick ⌘D stacked their clones), corrected: ⌘D's clone and ⌘V's copies go in at once, one undo step, and take their own files silently once copied (R1-5's second judgement of the refusals is gone with the wait); R2-2 LOW corrected (a stored crop up to 100 % a side travels; its sibling, a custom table border of an older stored shape, too); R2-3 LOW did not hold on the corrected tree (R1-4's rule refuses 201 blocks, MEASURED in three engines); R2-4 INFO measured and recorded. Review round 3 (a re-check on a copy of `blockcopy-frozen-3`) and its correction (stage "correction 3", record §9): 5 findings, 1 MEDIUM, 3 LOW, 1 INFO, each reproduced with the folded-in `C-r3-` scenarios in Chromium, Firefox and WebKit before the change (KEEP 1/1, MSGT 2/2, HIST 6/6, PT 1/1 in each); R3-1 MEDIUM (a figure cut in one poster and pasted in another while storage failed on a temporary error was lost from both) corrected: a pasted image keeps showing its own-folder source while storage is busy, as ⌘D's clone does; R3-2 LOW (the "couldn't be copied" toast after a ⌘Z or a Replace) corrected: the toast counts the poster as it is when shown; R3-3 LOW (an undo of a step made while a copy was out put the copy back on its original's file, saved) corrected in the undo and redo steps, and in a move, resize or rotate drag's step (a sibling found and measured in the round); R3-4 LOW (a regression: a word double-clicked in References could not be copied) corrected: a double- or triple-click's words stay; R3-5 INFO: this row reworded, the too-large toast's wording queued; after: every claim 0 in the three engines (60 scenarios), 86 of 86 mutants killed, web suite, tsc and the production build pass. A final check of correction 3 (on `blockcopy-frozen-4`) and its correction (stage "correction 4", record §9): 3 findings, 1 MEDIUM, 1 LOW, 1 INFO; F35-FC-1 MEDIUM (a figure cut in one poster and pasted in another was lost from both when storage made the first copy but its answer was lost, a gateway's 504 or a network failure: the retry under the same name was refused as a duplicate) reproduced with the folded-in `C-r3-cut-cross-504-written` and its sibling `-answer-lost` in Chromium and Firefox before the change (KEEP 1/1, D 1/1 each) and in WebKit with the uncorrected lines served, and corrected: each copy try writes a new name; F35-FC-2 LOW (a refusal not about the file empties a pasted image showing the user's own file) and F35-FC-3 INFO (a busy or interrupted paste keeps a reference into the other poster's folder) re-measured with the checker's probe and queued above; after: every claim 0 in the three engines (62 scenarios), 87 of 87 mutants killed, web suite, tsc and the production build pass; queued above: "Queued by record 35". The lead's decision on F35-FC-2 and its build (stage "correction 5", record §9): for a pasted image or a ⌘D clone whose source is in the user's own folder, the block is emptied, with the "couldn't be copied" toast, only when storage's first answer says the file does not exist (statusCode 404 with storage's "not found"); every other refusal or failure (a 403, an expired token's `InvalidJWT`, a 409, storage busy, a 404 after a busy try) keeps it showing its source with no toast, sharing that file until a later Replace gives it its own name; another account's file or a source that is not a storage path is unchanged; ⌘D's clone follows the same rule (a clone of a missing file is now emptied, with the toast: a reading the lead may revise, record §9); reproduced first with the folded-in `C-fc-` scenarios (KEEP 4 of 5 and MISS 1 of 2 in Chromium and Firefox on the uncorrected tree, the same in WebKit with the old code served); after: every claim 0 in the three engines (69 scenarios), 96 of 96 mutants killed, web suite (4665 tests), tsc and the production build pass |
