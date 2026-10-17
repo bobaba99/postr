@@ -1,0 +1,58 @@
+{
+ "tests": [
+  "src/pages/__tests__/EditorKeepsTextSizes.test.tsx",
+  "src/pages/__tests__/EditorSheetSize.test.tsx"
+ ],
+ "mutants": {
+  "K1-ceilings-back": {
+   "undoes": "rule 2 — a size that is not the old default as a whole is kept as stored, however large (the load-time ceilings of title 30, heading 14, authors and body 10 units put back)",
+   "edits": [
+    [
+     "src/pages/Editor.tsx",
+     "    if (preCalibration || !current) {",
+     "    if (!current || current.size > ({ title: 30, heading: 14, authors: 10, body: 10 } as Record<keyof Styles, number>)[level]) {"
+    ]
+   ]
+  },
+  "K2-one-level-is-enough": {
+   "undoes": "rule 1 — an old poster is recognised by all four of the old default's sizes, not by one (a title typed as 432 pt is 60 units)",
+   "edits": [
+    [
+     "src/pages/Editor.tsx",
+     "const preCalibration = LEVELS.every((level) =>",
+     "const preCalibration = LEVELS.some((level) =>"
+    ]
+   ]
+  },
+  "K3-old-poster-not-repaired": {
+   "undoes": "rule 1 — a poster holding the old default's four sizes opens at today's defaults",
+   "edits": [
+    [
+     "src/pages/Editor.tsx",
+     "    if (preCalibration || !current) {",
+     "    if (!current) {"
+    ]
+   ]
+  },
+  "K4-old-sizes-wrong": {
+   "undoes": "rule 1 — the old default's sizes are the posters table's first default, exactly: title 60, heading 28, authors 22, body 18 units (the body changed to 9)",
+   "edits": [
+    [
+     "src/pages/Editor.tsx",
+     "{ title: 60, heading: 28, authors: 22, body: 18 }",
+     "{ title: 60, heading: 28, authors: 22, body: 9 }"
+    ]
+   ]
+  },
+  "K5-missing-level-not-filled": {
+   "undoes": "rule 3 — a level missing from the stored poster is filled with today's default (kept from before record 37)",
+   "edits": [
+    [
+     "src/pages/Editor.tsx",
+     "    if (preCalibration || !current) {",
+     "    if (preCalibration) {"
+    ]
+   ]
+  }
+ }
+}

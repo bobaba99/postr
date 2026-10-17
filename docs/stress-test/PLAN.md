@@ -1356,8 +1356,12 @@ evidence label of each.
 Record `docs/fixes/33-text-size.md` section 10 has the detail and the
 evidence label of each.
 
-- **For the lead and the owner: a level raised by A+ past the editor's
-  load-time ceilings is reset on the next open.** The editor page replaces
+- **Done by record 37 (`docs/fixes/37-load-size-cap.md`, 2026-10-16):**
+  the editor page now recognises an old poster by the old default's four
+  sizes together and keeps every other size as stored (RELOAD, RELOADSTYLE,
+  RELOAD12, RELOADONE clean in three engines). The entry as queued:
+- ~~**For the lead and the owner: a level raised by A+ past the editor's
+  load-time ceilings is reset on the next open.**~~ The editor page replaces
   a level above a ceiling (`pages/Editor.tsx` `normalizeStaleStyles`:
   title 216, heading 100.8, authors and body 72 pt) with today's default
   when it opens a poster, taking it for an old document's broken default.
@@ -1416,6 +1420,110 @@ evidence label of each.
   "5" stores 5 pt, below the field's own minimum of 12. Record 33 now
   handles a body of 0 (A+ sets 28 pt, the label reads "Body – pt"); the
   field itself is unchanged.
+
+### Queued by record 37 (text sizes kept when a poster reopens, 2026-10-16)
+
+Record `docs/fixes/37-load-size-cap.md` section 10 has the detail and the
+evidence label of each.
+
+- **An emptied poster gets the starting template and the Classic palette
+  back on the next open** (a sibling of record 37's pattern, a load-time
+  repair keyed on something a user's own poster can also be; not the same
+  cause, and not changed there; MEASURED, `text-size-check.mjs`
+  `reload-emptied-user-filled` and `reload-emptied-tpl-3col`, Chromium,
+  Firefox and WebKit): every block deleted with "Delete block" (no credit
+  mark was placed on either poster, so none was left), "Nature / Biology"
+  picked, saved (the backend holds 0 blocks), reloaded: 14 blocks, the
+  3-column template, and the palette Classic again. `pages/Editor.tsx`
+  `hydrateIfEmpty` lays out the template for any stored poster with no
+  blocks, which a row the database has just created and a poster its user
+  emptied share. Their other values differ (corrected after record 37's
+  review round 1, R37-2; MEASURED `text-size-check.mjs` `new-row-defaults`
+  and `new-row-emptied`, Chromium, Firefox and WebKit): a new row holds the
+  posters table's column default (title 22 units, authors line height 1.5,
+  the palette with accent #0f4c75; next item), and a new poster emptied
+  with "Delete block" in today's editor differs from it only in its
+  palette (Classic, accent #1a80bb, written by its first save). A bounded
+  rule needs a decision, one of three: lay out a template only for a row
+  never saved by the editor (for example `updated_at` equal to
+  `created_at`, UNVERIFIED that every write moves it); only for a row
+  whose data equals the column default (it separates the two today; not a
+  poster emptied and saved before `c0af001`, 2026-07-28, while Classic was
+  the column default's palette, its styles untouched, INSPECTED; and not
+  once the next item is fixed by inserting today's defaults); or keep the
+  palette and only add blocks. MVP impact low (an empty poster is rare;
+  nothing typed is lost).
+- **A new poster does not start at the editor's defaults** (record 37's
+  review round 1, R37-1, MEDIUM; older than record 37 and not caused by
+  it: MEASURED `text-size-check.mjs` `new-row-defaults` in Chromium,
+  Firefox and WebKit, the same with record 37's change taken back,
+  `K1-ceilings-back`, Chromium; the reviewer read the same on the
+  production build, UNVERIFIED here). `data/posters.ts` `createPoster`
+  inserts only `{ user_id }`, so a new row's `data` is the posters table's
+  column default, which the migration file holds as title 22, heading 8,
+  authors 5, body 5 units, authors line height 1.5 and April's Classic
+  palette (`supabase/migrations/20260408000100_posters.sql`, under its own
+  comment "Keep these in sync with DEFAULT_STYLES"; no later migration
+  changes it). The client's `DEFAULT_STYLES` moved on twice without it:
+  the authors line height 1.5 → 1.15 (`6ded272`, 2026-04-11, the extra
+  spacing a user reported; a new poster's 1.5 is drawn at 1.2 by the
+  authors block's own clamp, `blocks.tsx` `Math.min(1.2, …)`, INSPECTED)
+  and the title 22 → 14 units "for a less-overwhelming default"
+  (`81e1699`, 2026-04-27). `hydrateIfEmpty`
+  replaces the palette, not the styles, and record 37's rule keeps them,
+  so a guest's first `/p/new` draws the title at 158.4 pt, the field
+  reading 158 (the dashboard's "+ New poster" calls the same
+  `createPoster`, INSPECTED). bounded-designs §3.7's A± arithmetic
+  assumes 100.8: on a new poster the title runs 123.2 to 211.2 pt over the
+  body's sizes, not 78.4 to 134.4 (4.4 × the body, not 2.8 ×;
+  arithmetic). The fake backend copies the migration file
+  (`fakeCopiesMigration` true); production's default was not read
+  (UNVERIFIED; at the old default, 60 units, the editor repairs a new
+  poster to today's sizes on open). A bounded fix: `createPoster` inserts
+  a document built from `DEFAULT_STYLES`, `DEFAULT_PALETTE`,
+  `DEFAULT_FONT_FAMILY` and `DEFAULT_HEADING_STYLE` (one source; the
+  column default no longer used by the app), a unit test entered at
+  `/p/new` that the new poster holds `DEFAULT_STYLES`, and
+  `new-row-defaults` made a claim; optionally a migration setting the
+  column default to the same, with the fake's `DEFAULT_DATA`. It removes
+  the previous item's second rule. For the lead: it touches every new
+  poster, and it is a cause of its own (where a new poster's data comes
+  from), so a branch of its own, not record 37's.
+- **A poster holding three of the old default's sizes and one changed by
+  hand now opens as stored** (record 37's rule: all four or none;
+  INSPECTED reachable only between autosave, 4e3190c, and the repair,
+  979df80, about 30 minutes on 2026-04-09 on the owner's local database;
+  MEASURED information `old-default-one-edited`: 60 / 28 / 22 / 9 units
+  draws 432 / 201.6 / 158.4 / 64.8 pt, where the ceilings reset three of
+  them). No change proposed.
+- **A database whose posters table was made by the migration as first
+  written** keeps the old column default (a migration edited in place is
+  not run again), so its new rows start at the old default; the editor
+  still repairs them on every open, and the next edit writes the repair
+  (INSPECTED; production's column default was not read: record 37 works on
+  the fake backend only). A database built from the migration file as it
+  is now starts them at title 22 units instead (the item above). Worth one
+  read-only check of `information_schema.columns` on production before
+  launch.
+- **The share page draws a stored poster as stored**, old default included
+  (432 pt title), while the editor repairs it (INSPECTED, `pages/Share.tsx`
+  calls no `normalizeStaleStyles`; sharing is hidden, `SHARING_ENABLED`).
+  Before record 37 the two also disagreed on every size above the old
+  ceilings; now only on the old default.
+- **A reload inside the autosave's 800 ms window** (record 37's review
+  round 1, R37-6, INFO; UNVERIFIED: the reviewer's harness, not
+  re-measured): the heading typed to 120 pt and the page reloaded 150 ms
+  later, the leave prompt accepted: the poster reopened with the old
+  heading and no data save reached the fake backend in 5 of 6 runs (the
+  dev server in Chromium, Firefox and WebKit, the production build in
+  Firefox and WebKit; the production build in Chromium saved), and Firefox
+  reported no leave prompt to Playwright. Not record 37's cause (the
+  autosave's flush on `beforeunload`, `hooks/useAutosave.ts`). For the
+  lead: a probe of its own in `keep-work-check.mjs` (whose leave-warning
+  scenarios close the tab 3 s after the edit, outside the window:
+  INSPECTED, `lib/keepWorkSave.mjs` S4), against a real local server
+  if possible, before deciding whether it loses work a user did not agree
+  to lose (whether a real Firefox shows the prompt there is not known).
 
 ## LaTeX export: before it is switched back on
 
@@ -1655,3 +1763,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 32 (MVP: pasting tables; fix 27's N2-F1) | `fix/table-paste` | implemented; its one review round (a simple feature: the browser, through the user's entry points, on `tablepaste-frozen-1`) done and corrected (6 findings: R1-F1, R1-F2 and R1-F3 MEDIUM corrected, each reproduced first with the committed instrument in the three engines and then 0; R1-F4 LOW, the table tip corrected to say a single copied cell replaces the cell's text, the behaviour queued for the owner; R1-F5 LOW, two docs corrected; R1-F6 INFO queued; the corrector's audit of its own correction found it lost a Shift+Enter line and a double space copied between blocks in Firefox, MEASURED, and corrected it); the correction is for the next lead pass, frozen copy `tablepaste-frozen-2` — `docs/fixes/32-table-paste.md` (bounded-designs.md §3.3 A, the lead's rule table, PowerPoint's behaviour): one line of text pasted into a table cell goes in at the caret; a grid (an HTML table from Excel, Word or Sheets, or text with tabs or line breaks) fills the table from the focused cell, across and down, growing it by rows and columns, no cell outside the pasted area changed, nothing dropped (merged cells keep the cells after them in their columns), one undo step; a paste into a text block or the title takes the poster's style (the source's colour and highlight dropped with its font and size; a style sheet's text and Google Docs' non-bold `<b>` wrapper dropped); a pasted cell's text stored as text. Reproduced from the user's entry with a real ⌘C/⌘V in Chromium, Firefox and WebKit (`scripts/table-paste-check.mjs`, on main: rule 1 broken in 3 of 3 scenarios, the table replaced by the grid in 12 of 12 grid scenarios, wrong in 11 (the twelfth covers the whole table from its first cell), an `<img onerror>` pasted as text ran in 2 of 2, colour or a style sheet's text kept in 4 of 5 text pastes; after: 0 in each engine, and on the production build in Chromium); after the review round: Word's own bold kept (`<b style='mso-bidi-font-weight:normal'>`: the not-bold check read any "font-weight: normal" in the style, so Word's bold was dropped in text blocks, a regression against main, and in cells), blank lines at the end of a paste no rows and rule 1's line ending with no line break (a paragraph Chromium copied with a triple-click emptied the cell below; WebKit added a blank line), a line wrapped in the clipboard's HTML source one line in cells, text blocks and the title, while text copied between blocks keeps its line breaks and spaces; the instrument's 30 scenarios 0 in each engine and on the production build in Chromium; 54 of 54 mutants killed; the three in-app sentences about pasting tables say what the paste does; queued above: "Queued by record 32" |
 | 33 (MVP design §3.7, owner decision D2) | `fix/text-size` | implemented — `docs/fixes/33-text-size.md`; the first build's tree (on `1d5addf`) was lost before it was committed, and the build was recovered from the author's transcript onto `c67a3db` (record 33 §9: nothing re-implemented; byte-identical to the first build wherever a copy survived) with every number below measured again there; reproduced first in Chromium, Firefox and WebKit (`text-size-check.mjs`: no text-size control in the top bar; raising every level one step took the Style tab's 4 fields and 4 undo steps, the ratios drifting up to 1.01 % and a round trip ending the title at 101 pt from 100.8, MEASURED); built: [A−] Body 36 pt [A+] in the top bar between Redo and Save PDF (`poster/TextSizeControl.tsx`, rules `poster/textSize.ts`): the body steps through 28 · 32 · 36 · 40 · 44 · 48 pt, title, heading and authors keep their ratio, unrounded, every return to a size exact (`===`, from an anchor: the naive new ÷ old formula missed on 4526 of 4549 swept walks), one undo step per press, the caret kept on a mouse press, the focus kept and the selection's keys blocked on a keyboard press, disabled at the bounds with a title saying why; the Edit tab's note names it; Auto-Arrange still never changes a size; after: every claim clean in three engines (13 posters, 147 presses, 65 returns to a size all `===`; the print document and the PowerPoint file at the new sizes; the top bar without overlap at 1024 and 1280 px); 25 of 25 mutants killed, 3 blind spots guarded in the browser; a sibling found and queued for the lead and the owner (a level set large and raised with A+ past the editor's load-time ceilings is reset on the next open, older than record 33: the Style tab reaches it too, MEASURED); its one review round (a simple feature: the browser, through the user's entry points, on `textsize-frozen-1`) done and corrected (6 findings: R1-F1 MEDIUM, a body that is not a size, the Style tab's Body field cleared stores 0 and left A+ promising 28 pt and doing nothing, and R1-F5 LOW, a title stored as null written as 0 by a press, one cause, corrected: such a body counts as below every size, A+ sets it to 28 pt and leaves the other levels, the label reads "Body – pt", another level that is not a size is left alone; reproduced first with the folded-in scenarios, OBSERVED in Chromium, Firefox and WebKit, then clean; R1-F2 MEDIUM, one A+ from a body typed at 12 pt resets title, heading and authors on reopen, left to the lead and the owner, queued above with the record corrected; R1-F3 LOW, two round trips 1 to 2 units in the last place off, measured and queued; R1-F4 LOW, the label near a size, an owner call; R1-F6 INFO); after: 46 scenarios clean in each engine, 32 of 32 mutants killed, 3 blind spots guarded; the correction is for the next lead pass, frozen copy `textsize-frozen-2` |
 | 34 (MVP: paste and drop on the canvas) | `fix/paste-drop` | implemented and reviewed (one round, a simple feature: the browser, through the user's entry points, on `pastedrop-frozen-1`; 10 findings, 2 MEDIUM, 6 LOW, 2 INFO, record §9): corrected R34-1 (a second file put into an image block while the first uploads drew nothing until a reload: only the last file now updates the block), R34-2 (an image with an `<img>` fragment and its address as text pasted nothing: "text" is now what a paste into a text block would insert), R34-3 (a dragged cell range then ⌘V made a stray block in Chromium: the canvas waits) and R34-7 (a paste behind the feedback dialog made a block: the dialog is marked modal), each reproduced first in the browser in three engines and red first in a unit test; R34-4 and R34-6 queued below; after: the instrument green in Chromium, Firefox and WebKit, 50 of 50 mutants killed, 3 of 3 blind spots guarded; the correction is in the frozen copy `pastedrop-frozen-2` — `docs/fixes/34-paste-drop.md` (bounded-designs.md §3.3 table A row 3, table B orders 2 to 5, Drop, Image checks; order 1, Postr's own copied blocks, is the next fix): ⌘V with nothing in edit mode makes a table block from an HTML table (record 32's reader), an image block from an image with no text (or fills the selected empty image block), a text block from any other text (record 32's cleaned paste), nothing otherwise, centred in the part of the sheet in view, snapped to the ½ in grid; an image pasted into a text block, a heading or the title makes an image block to its right, or below it as drawn; image files dropped on the canvas make image blocks centred on the drop point, each next 1 in down and right, and one dropped on an image block goes into it; non-images and files over 10 MB skipped with today's messages; every paste or drop one undo step; a paste into a field or with a dialog open makes nothing; a guest the same. Reproduced first from the user's entry (`scripts/canvas-paste-check.mjs`, real ⌘V where the engine allows it, trusted drops in Chromium) on a clean tree of `c67a3db` in Chromium, Firefox and WebKit: nothing happened in any row (B2 2/2, B3 7/7, B3F 1/1, B4 4/4, A3 3/3, DR 3/3, DM 1/1, DI 3/3, G 2/2; Chromium fired no `drop` at all), and the image block's own upload took three undo steps, stored a `blob:` address while the upload was out and kept a broken figure for a file over 10 MB (UP, UPB, UPX, the path a fill and a drop share, fixed with it: one update after the file is stored); after: every claim 0 in each engine and on the production build in Chromium; 43 of 43 mutants killed, 5 of 5 blind spots guarded in the browser; §3.3 D measured and left to the next fix (⌘Z after a same-type replace draws the new image); queued above: "Queued by record 34" |
+| 37 (record 33's sibling f, R1-F2) | `fix/load-size-cap` | implemented — `docs/fixes/37-load-size-cap.md`: the editor page's load-time repair (`pages/Editor.tsx` `normalizeStaleStyles`) replaced any text level above title 216, heading 100.8, authors or body 72 pt with today's default on every open, meant for posters stored before the typography calibration (979df80); the Style tab and A+ reach those sizes, so a user's own sizes were reset. Reproduced first from the user's entry in Chromium, Firefox and WebKit (`text-size-check.mjs`: a hand-set title 226.67 and heading 106.67 pt after A+, reopened 100.8 and 57.6; the Style tab's heading 110 pt, reopened 57.6; Body 12 pt then A+, 235.2 / 134.4 / 84 pt reopened 100.8 / 57.6 / 36; a title typed as 432 pt, reopened 100.8). Now an old poster is recognised by the old default's four sizes together (title 60, heading 28, authors 22, body 18 units, the posters table's first default, 853ec1c) and opens at today's defaults; every other size opens as stored; a missing level is still filled. After: the instrument clean in three engines (the old-default fixtures still repaired), 5 of 5 mutants killed; siblings measured (sheet size at the fields' bounds, palette and font kept; an emptied poster gets the template and Classic palette back, queued above); its one review round (a simple fix: the browser, through the user's entry points, the lead's, on `loadcap-frozen-1`) done: 7 findings (1 MEDIUM, 3 LOW, 3 INFO), none against the fix's code; corrected: the record's, the plan's and the checklists' sentences that took a new row for today's defaults (R37-2, R37-3 and its sibling in manual-test-flows §38, R37-4, R37-7) and §7's claim qualified (R37-5); the reviewer's probe folded into `text-size-check.mjs` as information (`new-row-defaults`, `new-row-emptied`, `old-default-strings`, `old-default-authors-absent`; after: exit 0 in three engines, 58 scenarios each); queued above: a new poster starts at the column default, title 158.4 pt (R37-1, MEDIUM, older than record 37, MEASURED in three engines; a cause of its own, for the lead) and a reload inside the autosave's window (R37-6, UNVERIFIED); the correction is in the frozen copy `loadcap-frozen-2` |
