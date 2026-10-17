@@ -439,8 +439,8 @@
         ],
         [
           "src/data/posters.ts",
-          "  }\n  forgetPosterScript(id);\n}",
-          "  }\n}"
+          "  }\n  forgetPosterScript(id);\n  dropKept(id);\n}",
+          "  }\n  dropKept(id);\n}"
         ]
       ]
     },

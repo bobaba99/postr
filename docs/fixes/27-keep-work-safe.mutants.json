@@ -243,7 +243,7 @@
       "edits": [
         [
           "src/hooks/useAutosave.ts",
-          "    while (inFlightRef.current) await inFlightRef.current;\n",
+          "    while (inFlightRef.current) {\n      await inFlightRef.current;\n    }\n",
           ""
         ]
       ]
@@ -363,8 +363,8 @@
       "edits": [
         [
           "src/hooks/useAutosave.ts",
-          "    while (inFlightRef.current) await inFlightRef.current;",
-          "    if (inFlightRef.current) await inFlightRef.current;"
+          "    while (inFlightRef.current) {\n      await inFlightRef.current;\n    }",
+          "    if (inFlightRef.current) {\n      await inFlightRef.current;\n    }"
         ]
       ]
     },
@@ -373,7 +373,7 @@
       "edits": [
         [
           "src/hooks/useAutosave.ts",
-          "      if (hadPending) void flush();\n",
+          "      if (hadPending) void flush(undefined, { keepalive: true });\n",
           ""
         ]
       ]
@@ -383,7 +383,7 @@
       "edits": [
         [
           "src/hooks/useAutosave.ts",
-          "      if (pendingRef.current === null) return undefined;\n      void flush();\n",
+          "      if (pendingRef.current === null) return undefined;\n      leaveWrite();\n",
           "      if (pendingRef.current === null) return undefined;\n"
         ]
       ]

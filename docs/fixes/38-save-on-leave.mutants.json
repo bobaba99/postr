@@ -1,0 +1,618 @@
+{
+  "tests": [
+    "src/poster/__tests__/saveOnLeave.test.tsx",
+    "src/poster/__tests__/saveOnLeaveRequest.test.tsx",
+    "src/data/__tests__/posterKeepalive.test.ts",
+    "src/hooks/__tests__/useAutosave.test.ts",
+    "src/poster/__tests__/keepWorkSafe.test.tsx",
+    "src/pages/__tests__/EditorKeptChange.test.tsx",
+    "src/pages/__tests__/dashboardDeleteKept.test.tsx"
+  ],
+  "mutants": {
+    "L1-hook-no-keepalive": {
+      "undoes": "L1 — a write made as the page is left asks the data layer for keepalive and the session's token (useAutosave write)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      await (keepalive ? upsertPoster(id, update, leaving) : upsertPoster(id, update));",
+          "      await upsertPoster(id, update);"
+        ]
+      ]
+    },
+    "L1-data-client-path": {
+      "undoes": "L1 — the data layer sends a keepalive save itself, at once, instead of through the client's asynchronous update (upsertPoster)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  if (options.keepalive && options.accessToken) {",
+          "  if (false) {"
+        ]
+      ]
+    },
+    "L1-request-not-keepalive": {
+      "undoes": "L1 — the request is sent with keepalive: true (sendKeepalive)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "    keepalive: true,",
+          "    keepalive: false,"
+        ]
+      ]
+    },
+    "L1-request-key-as-token": {
+      "undoes": "L1 — the request carries the session's token, as the client's own does when signed in (sendKeepalive)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "      Authorization: `Bearer ${accessToken}`,",
+          "      Authorization: `Bearer ${supabaseKey}`,"
+        ]
+      ]
+    },
+    "L1-request-other-headers": {
+      "undoes": "L1 — the request's headers are the client's own (sendKeepalive: Prefer)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "      Prefer: 'return=representation',\n",
+          ""
+        ]
+      ]
+    },
+    "L1-request-other-address": {
+      "undoes": "L1 — the request's address is the client's own (sendKeepalive: select=*)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "/rest/v1/posters?id=eq.${encodeURIComponent(id)}&select=*`",
+          "/rest/v1/posters?id=eq.${encodeURIComponent(id)}`"
+        ]
+      ]
+    },
+    "L1-errors-not-read": {
+      "undoes": "L1 — an error answer is a failed save, worded as the client's (readSaved)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  if (!res.ok) {",
+          "  if (false) {"
+        ]
+      ]
+    },
+    "L1-no-beforeunload-write": {
+      "undoes": "L1 — beforeunload writes the change before the dialog (useAutosave handler)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (pendingRef.current === null) return undefined;\n      leaveWrite();\n",
+          "      if (pendingRef.current === null) return undefined;\n"
+        ]
+      ]
+    },
+    "L1-no-pagehide": {
+      "undoes": "L1 — pagehide writes the change (useAutosave)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    window.addEventListener('pagehide', onPageHide);\n",
+          ""
+        ]
+      ]
+    },
+    "L1-no-visibility": {
+      "undoes": "L1 — the tab hidden writes the change (useAutosave)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    document.addEventListener('visibilitychange', onVisibility);\n",
+          ""
+        ]
+      ]
+    },
+    "L1-visibility-any": {
+      "undoes": "L1 — only the tab hidden writes early, not the tab shown again (useAutosave onVisibility)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (document.visibilityState === 'hidden') leaveWrite();",
+          "      leaveWrite();"
+        ]
+      ]
+    },
+    "L1-no-token": {
+      "undoes": "L1 — the session's token is kept as the client reports it (useAutosave onAuthStateChange)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      tokenRef.current = session?.access_token ?? null;",
+          "      tokenRef.current = null;"
+        ]
+      ]
+    },
+    "L1-token-at-open-only": {
+      "undoes": "L1 — the token the client reports last (a refresh) is the one sent (useAutosave onAuthStateChange)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      tokenRef.current = session?.access_token ?? null;",
+          "      if (_event === 'INITIAL_SESSION') tokenRef.current = session?.access_token ?? null;"
+        ]
+      ]
+    },
+    "L2-no-size-limit": {
+      "undoes": "L2 — a body over the keepalive limit goes through the client's update (upsertPoster)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "    if (new TextEncoder().encode(body).length <= KEEPALIVE_BODY_MAX) {",
+          "    if (true) {"
+        ]
+      ]
+    },
+    "L2-limit-in-characters": {
+      "undoes": "L2 — the limit counts bytes, not characters (upsertPoster)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "    if (new TextEncoder().encode(body).length <= KEEPALIVE_BODY_MAX) {",
+          "    if (body.length <= KEEPALIVE_BODY_MAX) {"
+        ]
+      ]
+    },
+    "L2-limit-whole-quota": {
+      "undoes": "L2 — the limit leaves room under the 64 KiB quota for the page's other keepalive requests (KEEPALIVE_BODY_MAX)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "export const KEEPALIVE_BODY_MAX = 60 * 1024;",
+          "export const KEEPALIVE_BODY_MAX = 64 * 1024;"
+        ]
+      ]
+    },
+    "L2-no-token-fallback": {
+      "undoes": "L2 — with no session token known, the client's own update (upsertPoster)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  if (options.keepalive && options.accessToken) {",
+          "  if (options.keepalive) {"
+        ]
+      ]
+    },
+    "L3-unmount-ordinary": {
+      "undoes": "L3 — the editor left inside the app writes the change with keepalive (useAutosave unmount)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (hadPending) void flush(undefined, { keepalive: true });",
+          "      if (hadPending) void flush();"
+        ]
+      ]
+    },
+    "L4-leave-write-untracked": {
+      "undoes": "L4 — the leave's write is the one write in flight: the next waits for it (useAutosave flush)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    inFlightRef.current = run;",
+          "    if (!keepalive) inFlightRef.current = run;"
+        ]
+      ]
+    },
+    "L4-chained-after-cutoff": {
+      "undoes": "L4 — nothing is sent while a write the leave cut off may still land, by a save waiting behind it or any other (useAutosave flush)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (cutOffRef.current) return false;\n",
+          ""
+        ]
+      ]
+    },
+    "L4-every-failure-cutoff": {
+      "undoes": "L4 — only a write out when the page began to be left counts as cut off (useAutosave write)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "        if (out.atLeave) markCutOff();\n        else if (!out.keepalive) noteFailure();",
+          "        markCutOff();"
+        ]
+      ]
+    },
+    "L4-beforeunload-not-a-leave": {
+      "undoes": "L4 — beforeunload marks the write out as out at a leave (useAutosave handler)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    const handler = (e: BeforeUnloadEvent) => {\n      markOutAtLeave();\n",
+          "    const handler = (e: BeforeUnloadEvent) => {\n"
+        ]
+      ]
+    },
+    "L4-cutoff-never-cleared": {
+      "undoes": "L4 — the wait after a cut-off ends (useAutosave markCutOff)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      settleTimerRef.current = null;\n      cutOffRef.current = false;\n",
+          "      settleTimerRef.current = null;\n"
+        ]
+      ]
+    },
+    "L5-no-dialog": {
+      "undoes": "L5 — the leave dialog while a change is unsaved, as before (useAutosave handler)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      e.preventDefault();\n      e.returnValue = '';\n      return '';",
+          "      return undefined;"
+        ]
+      ]
+    },
+    "R1-2-settle-short": {
+      "undoes": "L4, review round 1 R1-2 — after a cut-off nothing newer is sent for 10 s, not only until the 2 s retry (CUT_OFF_SETTLE_MS)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "export const CUT_OFF_SETTLE_MS = 10_000;",
+          "export const CUT_OFF_SETTLE_MS = 2_000;"
+        ]
+      ]
+    },
+    "R1-2-settle-no-write": {
+      "undoes": "L4, review round 1 R1-2 — when the wait after a cut-off ends, the change waiting is written (useAutosave markCutOff)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (aliveRef.current && pendingRef.current !== null) void flush();\n    }, CUT_OFF_SETTLE_MS);",
+          "    }, CUT_OFF_SETTLE_MS);"
+        ]
+      ]
+    },
+    "R1-2-pagehide-not-a-leave": {
+      "undoes": "L4, review round 1 R1-2 — pagehide marks the write out as out at a leave (useAutosave onPageHide)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    const onPageHide = () => {\n      markOutAtLeave();\n",
+          "    const onPageHide = () => {\n"
+        ]
+      ]
+    },
+    "R1-3-keepalive-per-caller": {
+      "undoes": "L1, review round 1 R1-3 — the next write sent after a leave asked carries keepalive, whichever caller sends it (useAutosave flush)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (keepalive) keepaliveAskedRef.current = true;\n    while (inFlightRef.current) {\n      await inFlightRef.current;\n    }\n",
+          "    while (inFlightRef.current) {\n      await inFlightRef.current;\n    }\n    if (keepalive) keepaliveAskedRef.current = true;\n"
+        ]
+      ]
+    },
+    "R1-3-ask-never-spent": {
+      "undoes": "L1, review round 1 R1-3 — a leave's ask for keepalive is spent by the write that carries it: an ordinary save stays the client's own (useAutosave write)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    const keepalive = keepaliveAskedRef.current;\n    keepaliveAskedRef.current = false;\n",
+          "    const keepalive = keepaliveAskedRef.current;\n"
+        ]
+      ]
+    },
+    "R1-4-keepalive-counted-cut": {
+      "undoes": "L4, review round 1 R1-4 — a keepalive write out at a leave event is not cut off by the page going (useAutosave markOutAtLeave)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (out && !out.keepalive) out.atLeave = true;",
+          "    if (out) out.atLeave = true;"
+        ]
+      ]
+    },
+    "R1-1-not-kept": {
+      "undoes": "L3, review round 1 R1-1 — the editor closed with a change not stored keeps it (useAutosave unmount)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (!(pendingRef.current && keep(pendingRef.current))) stop();",
+          "      stop();"
+        ]
+      ]
+    },
+    "R1-1-kept-without-listeners": {
+      "undoes": "L3/L5, review round 1 R1-1 — while a closed editor keeps a change, the leave dialog and the leave's write stay on (useAutosave unmount)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (!(pendingRef.current && keep(pendingRef.current))) stop();",
+          "      detachRef.current?.();\n      detachRef.current = null;\n      if (!(pendingRef.current && keep(pendingRef.current))) stop();"
+        ]
+      ]
+    },
+    "R1-1-never-stops": {
+      "undoes": "L3, review round 1 R1-1 — once the kept change is stored, nothing is kept any more (useAutosave flush)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (!mountedRef.current && pendingRef.current === null) stop();\n",
+          ""
+        ]
+      ]
+    },
+    "R1-1-kept-without-session": {
+      "undoes": "L3, review round 1 R1-1 — with no session that could store it, the change is not kept (useAutosave keep)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (tokenRef.current === null || user === null) return false;\n",
+          ""
+        ]
+      ]
+    },
+    "R1-1-kept-for-other-user": {
+      "undoes": "L3, review round 1 R1-1 — not kept for a user the poster was not opened for (useAutosave keep)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (ownerRef.current !== null && ownerRef.current !== user) return false;\n",
+          ""
+        ]
+      ]
+    },
+    "R1-1-sign-out-kept": {
+      "undoes": "L3, review round 1 R1-1 — signing out gives the kept change up (useAutosave onAuthStateChange)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (keptForRef.current !== null && sessionUserRef.current !== keptForRef.current) {\n        pendingRef.current = null;\n        stop();\n      }\n",
+          ""
+        ]
+      ]
+    },
+    "R1-1-no-takeover-at-open": {
+      "undoes": "L3, review round 1 R1-1 — the editor opened again takes the kept change's saving over (useAutosave mount)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (posterIdRef.current) takeOver(posterIdRef.current);\n",
+          ""
+        ]
+      ]
+    },
+    "R1-1-no-takeover-at-switch": {
+      "undoes": "L3, review round 1 R1-1 — a poster switched to in an open editor takes over a change kept for it (useAutosave effect)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (posterId) takeOver(posterId);\n",
+          ""
+        ]
+      ]
+    },
+    "R1-1-takeover-no-wait": {
+      "undoes": "L3/L4, review round 1 R1-1 — the editor opened again waits for the closed one's write out (useAutosave takeOver)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      inFlightRef.current = waits;\n",
+          ""
+        ]
+      ]
+    },
+    "R1-1-handover-keeps-pending": {
+      "undoes": "L3/L4, review round 1 R1-1 — the closed editor hands its change over and writes it no more (useAutosave handOver)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "        pendingRef.current = null;\n        stop();\n        return prior;",
+          "        stop();\n        return prior;"
+        ]
+      ]
+    },
+    "R1-1-thumbnail-after-close": {
+      "undoes": "L3, review round 1 R1-1 — a kept change's write takes no thumbnail once the editor has gone (useAutosave write)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (mountedRef.current) scheduleThumbnail(id);",
+          "      scheduleThumbnail(id);"
+        ]
+      ]
+    },
+    "R1-1-loader-ignores-kept": {
+      "undoes": "L3, review round 1 R1-1 — the poster opened again opens from the kept change, not the server's older copy (Editor loader)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "        const raw = (kept?.doc ?? row.data) as PosterDoc;",
+          "        const raw = row.data as PosterDoc;"
+        ]
+      ]
+    },
+    "R1-1-loader-ignores-kept-name": {
+      "undoes": "L3, review round 1 R1-1 — with the name the user gave it (Editor loader)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "kept ? (kept.title ?? row.title) : row.title",
+          "row.title"
+        ]
+      ]
+    },
+    "R2-1-no-cut-before-leave": {
+      "undoes": "L4, review round 2 R2-1 — an ordinary write that failed a moment before the leave event counts as cut by it (useAutosave markOutAtLeave)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (failWindowRef.current && pendingRef.current !== null) {\n      markCutOff();\n      endFailWindow();\n    }\n",
+          ""
+        ]
+      ]
+    },
+    "R2-1-failure-not-noted": {
+      "undoes": "L4, review round 2 R2-1 — an ordinary write's failure opens the 200 ms in which a leave counts it as cut (useAutosave write)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "        else if (!out.keepalive) noteFailure();\n",
+          ""
+        ]
+      ]
+    },
+    "R2-1-window-never-ends": {
+      "undoes": "L4, review round 2 R2-1 — the moment after a failure ends after CUT_BEFORE_LEAVE_MS: a leave later sends the change at once, and the waiting save goes (useAutosave noteFailure)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    const timer = setTimeout(() => endFailWindow(), CUT_BEFORE_LEAVE_MS);",
+          "    const timer = setTimeout(() => {}, CUT_BEFORE_LEAVE_MS);"
+        ]
+      ]
+    },
+    "R2-1-keepalive-failure-noted": {
+      "undoes": "L4, review round 2 R2-1 — a keepalive write's failure is no cut (the page going does not cancel it; R1-4) (useAutosave write)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "        else if (!out.keepalive) noteFailure();",
+          "        else noteFailure();"
+        ]
+      ]
+    },
+    "R2-3-ask-outlives-nothing-pending": {
+      "undoes": "L1, review round 2 R2-3 — the leave's keepalive ask is spent by a flush that finds nothing pending after its wait (useAutosave flush)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (cutOffRef.current || !pendingRef.current) keepaliveAskedRef.current = false;\n",
+          "    if (cutOffRef.current) keepaliveAskedRef.current = false;\n"
+        ]
+      ]
+    },
+    "R2-3-ask-outlives-cutoff": {
+      "undoes": "L1, review round 2 R2-3 — and by one that finds the write cut off (the newest, written 10 s later, is ordinary) (useAutosave flush)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (cutOffRef.current || !pendingRef.current) keepaliveAskedRef.current = false;\n",
+          "    if (!pendingRef.current) keepaliveAskedRef.current = false;\n"
+        ]
+      ]
+    },
+    "R2-2-loader-reads-kept-after-load": {
+      "undoes": "L3, review round 2 R2-2 — the kept change is read before the load waits, so one stored meanwhile still opens (Editor loader)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "        const kept = keptChange(row.id) ?? (row.id === posterId ? keptAtLoad : null);",
+          "        const kept = keptChange(row.id);"
+        ]
+      ]
+    },
+    "R2-4-delete-keeps-kept": {
+      "undoes": "L3, review round 2 R2-4 — a deleted poster's kept change goes with it (posters deletePoster)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  dropKept(id);\n",
+          ""
+        ]
+      ]
+    },
+    "R2-4-dropped-before-delete-succeeds": {
+      "undoes": "L3, review round 2 R2-4 — only once the delete succeeded: a delete that fails keeps the change (posters deletePoster)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "export async function deletePoster(id: string): Promise<void> {\n",
+          "export async function deletePoster(id: string): Promise<void> {\n  dropKept(id);\n"
+        ],
+        [
+          "src/data/posters.ts",
+          "  forgetPosterScript(id);\n  dropKept(id);\n}",
+          "  forgetPosterScript(id);\n}"
+        ]
+      ]
+    },
+    "R2-4-drop-does-not-stop": {
+      "undoes": "L3, review round 2 R2-4 — dropping it stops its keeper: no retry, no leave dialog (keptChanges dropKept)",
+      "edits": [
+        [
+          "src/hooks/keptChanges.ts",
+          "  kept.get(posterId)?.handOver();",
+          "  kept.delete(posterId);"
+        ]
+      ]
+    },
+    "R2-1-sibling-no-hold": {
+      "undoes": "L4, review round 2 R2-1's sibling — a save that waited on a write which then failed waits the 200 ms before it is sent (useAutosave flush)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    while (mayHold && failWindowRef.current) {\n",
+          "    while (false && mayHold && failWindowRef.current) {\n"
+        ]
+      ]
+    },
+    "R2-1-hold-every-save": {
+      "undoes": "L4, review round 2 R2-1's sibling — only a save that waited on the failed write, or that its own timer started (round 3, R3-2), is held; one the user or the page asks for after it (back online, ⌘S, the unmount, a take-over) goes at once (useAutosave flush)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    while (mayHold && failWindowRef.current) {\n",
+          "    while (failWindowRef.current) {\n"
+        ]
+      ]
+    },
+    "R3-1-answer-counted-as-cut": {
+      "undoes": "L4, review round 3 R3-1 — only a failure with no answer (status 0) may be the browser's cut: a server's error answer neither opens the 200 ms nor counts as cut at a leave (useAutosave write)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (status === 0) {\n",
+          "      if (true) {\n"
+        ]
+      ]
+    },
+    "R3-1-answer-cut-at-leave": {
+      "undoes": "L4, review round 3 R3-1 — a write out at the leave that the server answers with an error is no cut-off (correction 1's at-leave rule; useAutosave write)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (status === 0) {\n        if (out.atLeave) markCutOff();\n        else if (!out.keepalive) noteFailure();\n      }\n",
+          "      if (out.atLeave) markCutOff();\n      else if (status === 0 && !out.keepalive) noteFailure();\n"
+        ]
+      ]
+    },
+    "R3-1-client-status-dropped": {
+      "undoes": "L4, review round 3 R3-1 — the client's own update's failure carries its answer's status (upsertPoster)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "throw new SaveError(`Failed to save poster: ${error.message}`, status ?? 0);",
+          "throw new SaveError(`Failed to save poster: ${error.message}`, 0);"
+        ]
+      ]
+    },
+    "R3-1-keepalive-status-dropped": {
+      "undoes": "L4, review round 3 R3-1 — the keepalive save's error answer carries its status (readSaved)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "throw new SaveError(`Failed to save poster: ${message}`, res.status);",
+          "throw new SaveError(`Failed to save poster: ${message}`, 0);"
+        ]
+      ]
+    },
+    "R3-2-timer-save-not-held": {
+      "undoes": "L4, review round 3 R3-2 — a save its own timer starts (the 800 ms wait, a retry) in the moment after a failure with no answer waits that moment (useAutosave schedule)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      void flush(undefined, { fromTimer: true });",
+          "      void flush();"
+        ]
+      ]
+    }
+  }
+}

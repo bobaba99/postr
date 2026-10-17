@@ -1319,6 +1319,97 @@ evidence label of each.
   by record 34 (bounded-designs §3.3 B and row 3 of table A); an image
   into a cell stays out of its scope too.
 
+### Queued by record 38 (an edit made just before leaving is saved, 2026-10-16)
+
+Record `docs/fixes/38-save-on-leave.md` section 10 has the detail and the
+evidence label of each.
+
+- **A change made while a save is out, then the page left before that save
+  lands, is lost after the leave dialog** (by design: one write at a time;
+  MEASURED in Chromium, Firefox and WebKit, `keep-work-check.mjs` L4-*: the
+  held older poster stored, nothing over it). Sending it anyway put the
+  older poster over it in Firefox on main. Needs writes the server orders
+  (a version column or a sequence a write must exceed): conflict resolution,
+  with fix 27's R2-A2, the owner's call. Since correction 1 (review round 1,
+  R1-1) the same from the dashboard: a change the closed editor kept while
+  its save was out, then the tab closed (the dialog shows).
+- **After a save the leaving cut off, nothing newer is sent for 10 s**
+  (correction 1, R1-2; `CUT_OFF_SETTLE_MS`). It bounds, does not order: a
+  cut save the server applies later still can land over a newer one. Its
+  cost, MEASURED: a change made while the cut save was out and the page gone
+  within those 10 s is lost after the dialog, in two cells where the first
+  version of record 38 kept it (Firefox `L1-debounce-waiting-then-slow-
+  address`, WebKit `L4-slow-write-then-204-close`), against the first
+  version's older-over-newer writes in three cells (one of them under a
+  "Saved" pill). The owner's call with the item above: which to prefer until
+  writes are ordered on the server. Since correction 2 (review round 2,
+  R2-1) the same 10 s also follows an ordinary save that failed with no
+  answer 200 ms or less before the leave event (`CUT_BEFORE_LEAVE_MS`:
+  WebKit's Back fails the save out a few ms before `beforeunload`, and the
+  newer poster sent at once was stored under the older one, MEASURED). A
+  bounded choice beside the 10 s, the owner's to change: a network failure
+  that close to a leave counts as the leave's cut too (the leave's write is
+  not sent, the change lost after the dialog: MEASURED, `LW-net-close-60`,
+  three engines), and a save that waited on the failed write, or that its
+  own timer starts then, goes up to 200 ms later than before. Since
+  correction 3 (review round 3, R3-1) a save the server answered with an
+  error (an HTTP status: it stored nothing) is not counted: it had been,
+  losing the change after the dialog at a close within 200 ms and holding
+  it 10 s after Stay (MEASURED, `LW-500-*`, three engines).
+- **A page restored from bfcache sends the write that waited at `pagehide`
+  with keepalive** (record 38 §10; MEASURED once on the Chromium build,
+  `LB-bfcache-slow` and `-fail`): the leave's ask, spent by that write.
+  After hours in bfcache its token may have expired (a 401, then the
+  client's own retry; INSPECTED). Clearing the ask at `pageshow` would make
+  it ordinary.
+- **Two posters' changes kept at once share the keepalive quota at a close**
+  (record 38 §10, review round 3, R3-7): each sends its own leave write, the
+  64 KiB quota is the page's, `KEEPALIVE_BODY_MAX` is per request, so of two
+  bodies over 32 KiB the second is refused (MEASURED for two 40,000-byte
+  bodies, round 2's `L2-engine-keepalive-limit`; with two kept posters, not
+  driven). Real posters' saves are 1–9 KB. Sizing the cap by the keepalive
+  bytes in flight would close it.
+- **A gateway's timeout answer (502, 504) counts as a save that stored
+  nothing** (record 38 §6, correction 3): the database behind it may still
+  apply it, so a later save could land under it, as after any failed save
+  (fix 27's single writer counts a failed write done). INSPECTED, not
+  driven; with server-ordered writes (above).
+- **The dashboard says nothing about a change still being saved** after its
+  editor closed (correction 1): the browser's dialog at a close is the only
+  warning, and the dashboard's Duplicate copies the stored poster without
+  it (MEASURED since review round 2, `L3-inapp-kept-then-duplicate`, three
+  engines). A small "saving…" note on the dashboard would need copy of its
+  own. A poster deleted from its card takes its kept change with it since
+  correction 2 (R2-4); one deleted in another tab or device while its editor
+  is open here is retried, answered "no row", as before record 38 (two tabs:
+  out of scope).
+- **The thumbnail's own write is not caught** (`useAutosave.ts`,
+  `void upsertPoster(id, { thumbnailPath })`, older than record 38): with
+  saves failing it raises an unhandled rejection (a page error, no effect
+  on the user; seen in `L3-inapp-failing-reopen`).
+- **A poster switch in a mounted editor drops the outgoing change** (fix
+  27 §10, OF-03/OF-04): the cause record 38's correction 1 fixed for the
+  unmount (the change lives only in the hook); unreachable while the
+  in-editor Duplicate is hidden. Re-enabling it needs the same keeping.
+- **A save already out when the page goes is an ordinary request**: on a
+  slow network the browser may cancel it before it is sent (INSPECTED; the
+  fake backend answers at once, so not measured). Making every save
+  keepalive would cover it, but the hand-built request does not refresh an
+  expiring token as the client's own does.
+- **The diagnostics batch is not sent when the page goes**
+  (`lib/diagnostics.ts` `flushUiSignals` at `pagehide` awaits
+  `supabase.auth.getSession()` before its keepalive fetch, the cause record
+  38 fixed for the save): MEASURED 0 batches in Chromium and Firefox
+  (`LD-diagnostics-at-leave`; the control, the page kept 6 s: 1 batch).
+  Diagnostics only, not the user's work.
+- **Not measured in a real browser** (the manual flow §41): a keepalive
+  save outliving a closed tab on the real network, the CORS preflight of a
+  keepalive PATCH against the real Supabase project, a phone's tab hidden,
+  bfcache in Firefox and Safari (driven since review round 2 in Chromium
+  only: restored on the production build, nothing lost), real Safari, and
+  whether real Safari fails a save out before `beforeunload` on Back as
+  Playwright's WebKit does (UNVERIFIED).
+
 ### Queued by record 36 (select and move like PowerPoint, 2026-10-16)
 
 Record `docs/fixes/36-select-move.md` section 10 has the detail and the
@@ -1358,7 +1449,13 @@ evidence label of each.
   + ← cannot leave the editor; with nothing selected they stay the
   browser's. MEASURED cancelled in Chromium, Firefox and WebKit
   (`SM-I-arrow-chords-leave`). The owner may still prefer the browser's.
-- **An edit made just before leaving the editor's page may not be saved**
+- **Done by record 38 (`docs/fixes/38-save-on-leave.md`, branch
+  `fix/save-on-leave`): an edit made just before leaving is saved** (0 of
+  24 edit × way cells lost in Chromium, Firefox and WebKit, against 19–20,
+  8–10 and 20 of 24 on main; since its correction 1, also a change the
+  editor closed with when the dashboard is reached with a save failing or
+  out; what is left is queued under record 38 below). The
+  item as queued: **An edit made just before leaving the editor's page may not be saved**
   (hand to fix 27's area): a nudge followed at once by the page's own Back
   (`history.back()`, no key; the harness opens the editor as a second
   document, so Back unloads it) was not saved in Chromium and WebKit (0
@@ -1741,3 +1838,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 33 (MVP design §3.7, owner decision D2) | `fix/text-size` | implemented — `docs/fixes/33-text-size.md`; the first build's tree (on `1d5addf`) was lost before it was committed, and the build was recovered from the author's transcript onto `c67a3db` (record 33 §9: nothing re-implemented; byte-identical to the first build wherever a copy survived) with every number below measured again there; reproduced first in Chromium, Firefox and WebKit (`text-size-check.mjs`: no text-size control in the top bar; raising every level one step took the Style tab's 4 fields and 4 undo steps, the ratios drifting up to 1.01 % and a round trip ending the title at 101 pt from 100.8, MEASURED); built: [A−] Body 36 pt [A+] in the top bar between Redo and Save PDF (`poster/TextSizeControl.tsx`, rules `poster/textSize.ts`): the body steps through 28 · 32 · 36 · 40 · 44 · 48 pt, title, heading and authors keep their ratio, unrounded, every return to a size exact (`===`, from an anchor: the naive new ÷ old formula missed on 4526 of 4549 swept walks), one undo step per press, the caret kept on a mouse press, the focus kept and the selection's keys blocked on a keyboard press, disabled at the bounds with a title saying why; the Edit tab's note names it; Auto-Arrange still never changes a size; after: every claim clean in three engines (13 posters, 147 presses, 65 returns to a size all `===`; the print document and the PowerPoint file at the new sizes; the top bar without overlap at 1024 and 1280 px); 25 of 25 mutants killed, 3 blind spots guarded in the browser; a sibling found and queued for the lead and the owner (a level set large and raised with A+ past the editor's load-time ceilings is reset on the next open, older than record 33: the Style tab reaches it too, MEASURED); its one review round (a simple feature: the browser, through the user's entry points, on `textsize-frozen-1`) done and corrected (6 findings: R1-F1 MEDIUM, a body that is not a size, the Style tab's Body field cleared stores 0 and left A+ promising 28 pt and doing nothing, and R1-F5 LOW, a title stored as null written as 0 by a press, one cause, corrected: such a body counts as below every size, A+ sets it to 28 pt and leaves the other levels, the label reads "Body – pt", another level that is not a size is left alone; reproduced first with the folded-in scenarios, OBSERVED in Chromium, Firefox and WebKit, then clean; R1-F2 MEDIUM, one A+ from a body typed at 12 pt resets title, heading and authors on reopen, left to the lead and the owner, queued above with the record corrected; R1-F3 LOW, two round trips 1 to 2 units in the last place off, measured and queued; R1-F4 LOW, the label near a size, an owner call; R1-F6 INFO); after: 46 scenarios clean in each engine, 32 of 32 mutants killed, 3 blind spots guarded; the correction is for the next lead pass, frozen copy `textsize-frozen-2` |
 | 34 (MVP: paste and drop on the canvas) | `fix/paste-drop` | implemented and reviewed (one round, a simple feature: the browser, through the user's entry points, on `pastedrop-frozen-1`; 10 findings, 2 MEDIUM, 6 LOW, 2 INFO, record §9): corrected R34-1 (a second file put into an image block while the first uploads drew nothing until a reload: only the last file now updates the block), R34-2 (an image with an `<img>` fragment and its address as text pasted nothing: "text" is now what a paste into a text block would insert), R34-3 (a dragged cell range then ⌘V made a stray block in Chromium: the canvas waits) and R34-7 (a paste behind the feedback dialog made a block: the dialog is marked modal), each reproduced first in the browser in three engines and red first in a unit test; R34-4 and R34-6 queued below; after: the instrument green in Chromium, Firefox and WebKit, 50 of 50 mutants killed, 3 of 3 blind spots guarded; the correction is in the frozen copy `pastedrop-frozen-2` — `docs/fixes/34-paste-drop.md` (bounded-designs.md §3.3 table A row 3, table B orders 2 to 5, Drop, Image checks; order 1, Postr's own copied blocks, is the next fix): ⌘V with nothing in edit mode makes a table block from an HTML table (record 32's reader), an image block from an image with no text (or fills the selected empty image block), a text block from any other text (record 32's cleaned paste), nothing otherwise, centred in the part of the sheet in view, snapped to the ½ in grid; an image pasted into a text block, a heading or the title makes an image block to its right, or below it as drawn; image files dropped on the canvas make image blocks centred on the drop point, each next 1 in down and right, and one dropped on an image block goes into it; non-images and files over 10 MB skipped with today's messages; every paste or drop one undo step; a paste into a field or with a dialog open makes nothing; a guest the same. Reproduced first from the user's entry (`scripts/canvas-paste-check.mjs`, real ⌘V where the engine allows it, trusted drops in Chromium) on a clean tree of `c67a3db` in Chromium, Firefox and WebKit: nothing happened in any row (B2 2/2, B3 7/7, B3F 1/1, B4 4/4, A3 3/3, DR 3/3, DM 1/1, DI 3/3, G 2/2; Chromium fired no `drop` at all), and the image block's own upload took three undo steps, stored a `blob:` address while the upload was out and kept a broken figure for a file over 10 MB (UP, UPB, UPX, the path a fill and a drop share, fixed with it: one update after the file is stored); after: every claim 0 in each engine and on the production build in Chromium; 43 of 43 mutants killed, 5 of 5 blind spots guarded in the browser; §3.3 D measured and left to the next fix (⌘Z after a same-type replace draws the new image); queued above: "Queued by record 34" |
 | 36 (MVP design §3.4; items 6 and 22, OF-06, OF-11) | `fix/select-move` | implemented and reviewed (one round, a simple feature: the browser, through the user's entry points, on `selectmove-frozen-1`; 6 findings, 3 LOW, 3 INFO, record §9): corrected R36-1 (a drag that changes nothing, the group's or one block's, and, found here, an arrow pressed at the sheet's edge added an empty undo step, so the next ⌘Z showed nothing: the store's `setBlocks` now adds no step for a list that changes nothing, as `updateBlock`, `patchDoc` and `removeBlock` did; K4j and K3e observed in Chromium, Firefox and WebKit before, clean after), R36-3 (four sentences, and a fifth from main, about the grid, the Mac's fine key, line references and Esc in sidebar fields, made true) and R36-4 (the keys read one test of "a dialog is open" with Esc, undo and ⌘P; record 34's R34-7 sibling); R36-2 (Alt + ← and the other platform's key + ← are the browser's while a block is selected, as the rule says; main cancelled them) is an owner question above ("Queued by record 36"), its lost-edit half handed to fix 27's area there; R36-5 and R36-6 noted; fix 12's whole harness clean in the three engines after; the correction is in the frozen copy `selectmove-frozen-2` — `docs/fixes/36-select-move.md`; the design's key rule and gestures, reproduced first in Chromium, Firefox and WebKit on main with fix 12's harness extended (`undo-history-check.mjs --only SM`, `lib/selectMoveScenarios.mjs`): Backspace, Delete, → and ⌘D on a focused menu removed, moved or copied the selected block (OF-11; the guard was copied at three places, the table's range listener cleared a dragged range too), Esc never left text or deselected, ⌘A selected nothing, ⌘ / Ctrl / Alt + arrow moved ½ in and Shift + arrow 0.1 in, one ⌘Z after a group move or resize left every block where the drag put it (OF-06); after: the three guards one test (`canvasPaste.ts` `isEditing`), Esc (`selectionKeys.ts`, in the capture phase: a dialog or a marked menu takes it first) leaves text with the block selected and otherwise deselects, ⌘A selects every block but the credit mark, ⌘ + arrow on a Mac and Ctrl + arrow elsewhere 0.1 in (Ctrl + arrow PowerPoint's finer nudge on Windows, ⌘ on a Mac by the same rule; read in Microsoft's documentation first), every other modifier with an arrow nothing, the group drag one step undone exactly and redone; every claim 0 in the three engines (the instrument reads the store from `/src`, so not on the production build), each part red in the browser on its own; fix 12's whole harness clean in the three engines, fix 34's canvas-paste-check clean in Chromium (before the correction; after it see record §8b); 25 of 25 mutants killed before the correction (after it 28 of 28, and fix 34's paste check clean in the three engines), 2 blind spots (one guarded in the browser, one unreachable and accepted); queued above: "Queued by record 36" |
+| 38 (record 36 §10's handoff: a save on leaving) | `fix/save-on-leave` | implemented; review round 1 run and corrected (correction 1, 2026-10-17: R1-1 HIGH, the dashboard reached with a failing or slow save lost the change silently, in three engines and on main: the change is now kept by the page until stored and the poster opened again opens from it; R1-2 MEDIUM, a newer save landed before an older cut-off one with a slow next page, Firefox and WebKit: nothing newer for 10 s after a cut-off; R1-3 and R1-4 LOW fixed; the round's cells clean in three engines; 43 of 43 mutants killed, fix 27's 69 of 69; suite 4,626 of 4,626); review round 2 run and corrected (correction 2, 2026-10-17: R2-1 MEDIUM, WebKit's Back failed the save out just before `beforeunload` and the newer poster sent at once was stored under the older one: a failure 200 ms or less before the leave now counts as its cut, and a save that waited on the failed write waits those 200 ms (its sibling, found with main as the control: main stored the waiting save under the cut one in WebKit, 1 of 4 runs); R2-2, R2-3 and R2-4 LOW fixed: the poster opened again reads the kept change before its load, the leave's keepalive ask is spent when nothing is written, a deleted poster's kept change goes with it; the round's probes folded in, `lib/keepWorkLeaveRound2*.mjs`; 55 of 55 mutants killed, fix 27's 69 of 69; suite 4,635 of 4,635); review round 3 run and corrected (correction 3, 2026-10-17: R3-1 LOW, a save the server answered with an error was counted as the browser's cut, so a change was lost after the dialog at a close within 200 ms, or stored 10 s late after Stay, in three engines: only a failure with no answer counts now, the data layer keeping the answer's status on the error (also the failure diagnostic's, always 0 before); R3-2 LOW, the newer edit's own wait firing in the 200 ms after a cut was not held: older over newer on the WebKit build 1 of 21, and in three engines with the order made deterministic: held now; R3-3 references regenerated; the round's probes folded in, `lib/keepWorkLeaveRound3.mjs`; 60 of 60 mutants killed, fix 27's 69 of 69; suite 4,644 of 4,644); no round 4 by the stopping rule, the lead's call — `docs/fixes/38-save-on-leave.md`; reproduced first from the user's entry with fix 27's instrument, extended (`keep-work-check.mjs --only L`, `lib/keepWorkLeave.mjs`): an edit then a leave at once lost in 19–20 of 24 cells in Chromium, 20 in WebKit and 8–10 in Firefox (four silently, a reload), an older poster stored over a newer one in Firefox (a slow save, an edit, a new address), a failed save recovered then the tab closed lost in Chromium and WebKit, the dashboard then the tab closed lost in all three; cause: the save made at `beforeunload` waited on the client's asynchronous session read, and the page went first; changed: the leave's write sent at once with keepalive (beforeunload before the dialog, pagehide, the tab hidden, the unmount), one write at a time kept, no write right after one the leave cut off; 0 of 24 lost in the three engines, L4 clean, fix 27's scenarios clean; 25 of 25 mutants killed |
