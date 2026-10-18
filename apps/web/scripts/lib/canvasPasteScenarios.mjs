@@ -20,7 +20,7 @@ import { pinchTo } from './selectionControls.mjs';
 import {
   IMAGES, PDF_FILE, addedBlocks, allowClipboard, bigPng, catchAlerts, dispatchPaste, drawnBlock, emptySheetPoint, eventCount, eventsSince,
   fileOf, handOver, imageMode, inside, onSheet, othersChanged, settledChange, sheetUnits, storedBlocks, storedEquals, until, uploadsOf,
-  waitPaint, watchEvents, writeClipboardItem, writeImageToClipboard,
+  keyedName, waitPaint, watchEvents, writeClipboardItem, writeImageToClipboard,
 } from './canvasPasteKit.mjs';
 import { rowOf } from './keepWorkKit.mjs';
 
@@ -134,7 +134,7 @@ function judgeNew(blk, want, ctx) {
     const wantW = aspect >= boxAspect ? IMAGE_BOX.w : Math.round(IMAGE_BOX.h * aspect);
     if (Math.abs(blk.w / blk.h - aspect) > 0.03) p.push(`shape ${(blk.w / blk.h).toFixed(3)}, the image's ${aspect.toFixed(3)}`);
     if (Math.abs(blk.w - wantW) > 1 || blk.h > IMAGE_BOX.h + 2) p.push(`size ${blk.w} × ${blk.h}, want the image's shape in ${IMAGE_BOX.w} × ${IMAGE_BOX.h} (w ${wantW})`);
-    if (!new RegExp(`^storage://${ctx.uid}/${ctx.posterId}/${blk.id}\\.png$`).test(blk.imageSrc ?? '')) p.push(`imageSrc ${String(blk.imageSrc).slice(0, 80)}`);
+    if (!new RegExp(`^storage://${ctx.uid}/${ctx.posterId}/${keyedName(blk.id, 'png')}$`).test(blk.imageSrc ?? '')) p.push(`imageSrc ${String(blk.imageSrc).slice(0, 80)}`);
   }
   if (want.type === 'table') {
     const t = blk.tableData;
@@ -631,7 +631,7 @@ async function runFill(h, s, sc) {
   const p = [];
   if (added.length) p.push(`${added.length} blocks added`);
   const aspect = IMAGES.C.w / IMAGES.C.h;
-  if (!new RegExp(`^storage://${s.uid}/${s.id}/${img.id}\\.png$`).test(blk?.imageSrc ?? '')) p.push(`imageSrc ${String(blk?.imageSrc).slice(0, 80)}`);
+  if (!new RegExp(`^storage://${s.uid}/${s.id}/${keyedName(img.id, 'png')}$`).test(blk?.imageSrc ?? '')) p.push(`imageSrc ${String(blk?.imageSrc).slice(0, 80)}`);
   if (blk && Math.abs(blk.w - img.w) > 0.01) p.push(`width ${blk.w}, was ${img.w}`);
   if (blk && Math.abs(blk.h - Math.round(img.w / aspect)) > 1) p.push(`height ${blk.h}, want the image's shape ${Math.round(img.w / aspect)}`);
   const ups = uploadsOf(s.state, img.id, since);

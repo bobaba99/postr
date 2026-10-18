@@ -26,6 +26,16 @@ Detail: `docs/legal/quebec-law-25.md` (internal, not legal advice) and record 24
   under PIPEDA; US adequacy only for Data Privacy Framework companies) and whether
   Vercel's approximate location counts as "locating" under s. 8.1.
 
+- **Copied blocks carry a storage path with the account id** (record 35, R2-4): when blocks
+  are copied with ⌘C and pasted into another app's rich-text field (an e-mail, a document),
+  the hidden payload is pasted too, and image paths include the account's id (a random
+  id, not a name). Worth one line in the privacy page if you want it covered.
+- **Files nobody uses any more stay in storage** (the orphan-files clean-up, on the Later
+  list): on production 948 of 961 poster files belong to users who no longer exist, and
+  since record 35 each Replace leaves one file behind (undo and saved versions may still
+  need it). The privacy page already says this as it is (images kept until you delete
+  your account; a deleted poster's files stay; guests' files have no set period), so no
+  wording change is needed; the clean-up is storage housekeeping.
 - **The legal pages still describe hidden features (record 29, not blocking).** The
   privacy policy says what import, Copy a design, Scan image and the Staples print
   helper send "if you use" them. All four are hidden since 2026-10-07
@@ -150,11 +160,13 @@ where you want the other way.
 - **One copied spreadsheet cell** (record 32, R1-F4): it replaces the text already in
   the cell (the table tip says so). The other way: insert it at the caret like typed
   text.
-- **A hand-set title over 216 pt (or heading over 100.8 pt) resets when the poster reopens**
-  (record 33 §10; older than A−/A+): a load-time check meant for very old posters replaces
-  any level above those caps with the default, so a big title typed in the Style tab, or
-  A+ pressed from a very small body, comes back smaller. It will be fixed to recognise only
-  the old defaults; listed because it changes what you see on reopen.
+- **Every new poster starts with a 158 pt title, not 101 pt** (record 37, R37-1; confirmed on
+  production with a read-only query): the database's default for a new poster still holds
+  the title size from before the April calibration (22 units), and the app inserts a new
+  poster without its own defaults, so the editor's 100.8 pt default never reaches it (also
+  an authors line height of 1.5 and an older accent colour). Not changed (your stop rule);
+  a one-place fix (the new poster written with the editor's defaults) if you want it before
+  marketing.
 - **The text-size label rounds** (record 33, R1-F4): a body of 47.9 pt reads "Body 48 pt"
   and A+ then looks like it does nothing (it goes to 48). Kept: the label shows whole pt.
 - **An empty figure's "Figure N." and an empty heading's number** (record 31 §10): an
@@ -162,6 +174,28 @@ where you want the other way.
   file leaves an empty figure out (so later figure numbers there skip one); an empty
   heading prints its number "1." in both. These are numbers, not hints: print them,
   or leave them out?
+- **The rulers are back on** (plan item 4, at your word on 16 Oct): Layout › Show ruler is
+  ticked when the editor opens and is not remembered across reloads. Say if they should
+  start hidden.
+- **Alt + ← with a block selected** (record 36, R36-2, decided at merge): it is cancelled,
+  so it cannot take you out of the editor (main did the same). If you prefer the browser's
+  Back there, it is a one-line change.
+- **Superscript and subscript keys on a Mac** (record 39): Microsoft's pages give Control,
+  not ⌘ (Control + Shift + = and Control + =), so that is what Postr takes; ⌘ + = stays the
+  browser's zoom.
+- **"/" after a bracket, an emoji or Chinese/Japanese text** (record 39, R1-F7): it opens no
+  symbol menu (only a slash at a word's start does). Should a bracket or quote count as a
+  word start?
+- **A cut figure when storage fails** (record 35): a pasted picture keeps showing its source
+  file unless storage says the file is missing; a ⌘D copy of a missing file is emptied with
+  a note. Chosen so a picture is never lost.
+- **The save on leaving: two time limits** (record 38): a save that fails with no answer up
+  to 200 ms before you leave counts as cut off by the leave, and after such a cut nothing
+  newer is sent for 10 s (both keep older work from landing over newer). Bounded choices;
+  real browsers' timings are not measured. A poster save over 60 KiB still relies on the
+  leave dialog.
+- **A keyboard user who clicks A+** loses the focus ring until the next Tab (plan item 20,
+  R20-3). Listed, not changed.
 - From record 29: the closed poster's "Download a copy" still saves a `.postr` file,
   which the app cannot import while import is hidden; keep it as the way out, or
   offer the PDF instead.

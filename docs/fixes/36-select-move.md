@@ -213,3 +213,11 @@ then the mutant `arrow-chord-not-cancelled` (killed). On the final tree (lead, M
 WebKit: Alt + ← and Ctrl + ← stayed, cancelled (the early-leave save: lost in Chromium and WebKit,
 kept in Firefox, unchanged and queued); record 34's `canvas-paste-check.mjs` in Chromium exit 0
 (every claim 0); `mutation-check.mjs` 29 of 29 mutants killed (2 documented blind spots).
+
+## 12. Since the merge with record 35 (2026-10-17)
+
+A group move or resize now sets only the selected blocks' place and size, from where each started,
+on the poster as it is at each step, and its undo snapshot is the blocks at their pre-drag place
+and size (`atPreDragGeometry`), as a single block's drag: before, each step rebuilt the whole
+poster from the drag's start, so a change that landed during the drag (an upload, a pasted copy's
+own file) was lost. Record 35 §11 has the tests and numbers.

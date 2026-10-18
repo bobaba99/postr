@@ -90,6 +90,17 @@ A new finding that does not block that scope goes on the Later list below
 plan item, no skeptic, no owner question. Only a finding that blocks the
 scope becomes a plan item or a question for the owner.
 
+### Stopped here (the owner, 2026-10-16: "after fix 4, 20, 35, 37, 38, and 39, stop with fixes, it should be good enough for marketing now")
+
+Not started, moved to Later with the MVP build list's remaining lines (`docs/launch/mvp-editor/bounded-designs.md` §5.2):
+
+- **#13, the block menu on every kind** (right-click: Cut · Copy · Paste · Duplicate · Bring to Front · Send to Back · Delete; today the menu skips title, text, heading, authors and table, and offers one-step Bring Forward / Send Back only). Record 36 found that Esc does not close it (below).
+- **#12, the window's 8 tabs** (Design merging Layout and Style, Format for "edit block", the Format-opening rule, the tour's targets renamed).
+- **#14, the blocks' rules**: Insert › Logo skips the locked credit mark (it can select the mark and add nothing, INSPECTED by record 35); Insert lists Title and Authors while the poster has none; Tab in a table's last cell adds a row; `.enw` dropped.
+- **#15, a palette pick clears per-level colours.**
+- **The orphan-files clean-up** (948 of 961 poster files on production belong to users who no longer exist; since record 35 each Replace leaves one unused file). Files referenced by any poster's blocks or saved versions are never deleted (record 35, F35-FC-3). A purge script the owner runs.
+- **New posters start at the database default's 158.4 pt title** (record 37, R37-1; production's column default confirmed read-only): write a new poster with the editor's own defaults.
+
 ### Later
 
 - Where keyboard focus goes after ⌘/ hides the sidebar: typing can edit a
@@ -111,19 +122,68 @@ scope becomes a plan item or a question for the owner.
   (MEASURED from layout and the grid's computed CSS by
   `ruler-check.mjs`'s INFO `grid` reading; paint not read). The same kind
   of cause as fix 04; the rulers' measured sheet position could feed its
-  `background-position` (record 04 section 6).
+  `background-position` (record 04 section 6). Since record 29 the grid is
+  not drawn (`ADJUSTMENTS_ENABLED` off; ruler-check's `grid` reading is null
+  in every scenario on `ac7d793`, record 04 section 10), so this waits for the
+  grid's return.
 - At the 20 % zoom floor the rulers draw a mark every 2 px (an inch is
   2 px): a solid band, no labels readable (INSPECTED, from fix 04's
   `zoom-out-to-floor` numbers; not looked at by eye).
-- The rulers lag the sheet by a frame while the canvas animates or scrolls
-  (MEASURED by fix 04's step 9 reviewer, `transient-probe.mjs`, from layout
-  at each animation frame; paint not read): closing the guidelines panel at
-  1920 × 1080, 13 of 168 and 16 of 172 frames over 0.5 px, worst 87.08 and
-  88.17 px; hiding the sidebar at 1280 × 800, 16 of 174 frames, worst
-  133.36 px, each on the first frame after the click; a 30 px wheel scroll,
-  1 of 179 frames, 30 px, the same as main; at rest 0. Likely because the
-  reading is set from the resize callback and renders after that frame
-  paints (INSPECTED, the reviewer's inference).
+- On a wheel scroll the compositor paints the scrolled sheet before the page
+  runs any code, so the rulers show the old position for a frame or two
+  (main's too; no page code removes it). Painted frames, production build:
+  Chromium 8 of 8 events on the fix and on main, Firefox 1 of 8 against
+  main's 2 of 8, WebKit 0 of 8 against 4 of 8 (MEASURED by fix 04's second
+  step 10 review, its reviewer R3, on main `7f93b5b`; not re-measured on
+  `ac7d793`). The other lags this entry used to list (the guidelines panel
+  closing, the sidebar hiding) were fix 04's own and its cause C fixed them
+  (record 04).
+- Fix 04, E-02: leaving Preview after the window grew renders the rulers
+  synchronously in one long frame: 597 against 250 ms without that path in
+  the dev build (the step 9-F review), 76–95 ms against main's 60–253 ms in
+  production (fix 04's second step 10 review, R3), both Chromium at 4× CPU
+  (MEASURED on `7f93b5b`; not re-measured since the port).
+- Fix 04, the 600 px margin: its unit-test bound lies between 300 (fails)
+  and 600; 500 passes and is unmeasured in a browser (TESTED).
+- Fix 04, S9C-06: Firefox logs a scroll-linked positioning warning; whether
+  it is linked to a wheel scroll's lagging frame (1 of 8 events on the fix
+  against 2 of 8 on main, MEASURED by fix 04's second step 10 review, R3) is
+  not measured.
+- Fix 04, the pinch's cost: each step spends more time in the rulers than on
+  main (production, 4× CPU: 8.5 against 6.4 ms per step; a frame over 50 ms in
+  5 of 6 runs against 2 of 6; MEASURED by the second step 10 review's critic
+  on `7f93b5b`).
+- Fix 04, the number of marks grows with how far the content reaches (a block
+  1,000 in off the sheet: 1,099 top marks at the fit against 143; MEASURED by
+  the second step 10 review's critic).
+- Fix 04, R1-F1 of its first step 10 review: with CSS `zoom` on the page (no
+  user control sets it), the rulers mix zoomed and unzoomed pixels (MEASURED
+  by that reviewer on `7f93b5b`).
+- Fix 04's first step 10 review, main's own (MEASURED by its R2 and R3 on
+  `7f93b5b`): Zoom in and Zoom out zoom about the scroll origin, not the
+  view's centre (R2-02); a pinch over the zoom bar is not default-prevented
+  (R2-03); a 5-inch label pops in at a bar's start (R2-04); the text editor's
+  focus hint stays behind when the sidebar hides or the window resizes (R3-04).
+- Ruler units other than inches (centimetres, points): not offered (fix 04's
+  bounded design, record 04 section 11).
+- Fix 04's paint judge cannot judge Firefox: its known-answer control (each
+  marks' layer moved half a device pixel by a translate) reads 0 of 55 ticks
+  smeared there, since Firefox paints the translated layer snapped (MEASURED
+  by the review of the port, R1-F2, and by its corrector, record 04 §11.9).
+  A control Firefox cannot snap (a layer scaled by a non-integer factor)
+  would be needed; until then Firefox's painted ticks are manual-test-flows
+  §44's.
+- The browser's own File › Print of the editor page (which no key the app
+  catches; ⌘P prints the poster) prints the editor page itself: the sidebar,
+  the top bar and the canvas (MEASURED under print media by the review of
+  fix 04's port, R1-F3: the sidebar laid out and shown). Since that review
+  the rulers are hidden there (record 04 §11.9); the rest is main's own. A
+  print stylesheet for the editor chrome, or a `beforeprint` that hands over
+  to the app's print, would cover it.
+- Fix 04 at a browser zoom, beyond Chromium: the painted ticks at ratios 0.9,
+  1.1, 1.8 and 2.2 are measured in Chromium only (record 04 §11.9); WebKit's
+  and Firefox's at those ratios, and a real Ctrl/Cmd +/− (emulated here as a
+  device scale factor), are not run.
 - With reduced motion requested (`prefers-reduced-motion`), opening the
   guidelines panel still animates the canvas's width, through 12 distinct
   values (MEASURED by fix 04's step 9 reviewer, round 2,
@@ -396,13 +456,14 @@ scope becomes a plan item or a question for the owner.
   (MEASURED by the step 9 reviewer of 60ca7b3, mutant F6; it predates that
   change).
 
-- **Item 4, the rulers, hidden by the owner (2026-09-30):** `RULERS_ENABLED`
-  is off; the fix is parked on the local branch `editor/rulers-match-sheet`
-  (its record, `ruler-check.mjs`, `ruler-sync-check.mjs` and a first
-  `ruler-paint-check.mjs`). Open there: placing the marks by layout instead of
-  a transform (the step 9-G critic's CG-1), a committed paint check (CG-3),
-  and skipping its share scenarios while sharing is hidden. The ruler items
-  above wait for it.
+- **Item 4, the rulers, hidden by the owner (2026-09-30), un-parked on
+  2026-10-16 ("start them now"):** finished on `fix/04-rulers` (the parked
+  branch `editor/rulers-match-sheet` brought onto main `ac7d793`) and shown
+  again, `RULERS_ENABLED = true` (record `docs/fixes/04-rulers-match-sheet.md`,
+  section 11): the marks placed by layout, not a transform (CG-1, decided by
+  `ruler-paint-check.mjs`, now committed and run), the share scenarios
+  skipped while sharing is hidden, and the guidelines panel's while
+  `EDITOR_EXTRAS_ENABLED` is off. The ruler items above stay on this list.
 - **Fix 13, legend titles** are raised with legend text (fix 13b keeps it:
   `legend.title_fontsize` is set with `legend.fontsize`). Not a class the
   checker lists, so a policy for the owner: f32 at 4 × 3 in crosses 1.394 in²
@@ -1402,13 +1463,111 @@ evidence label of each.
   38 fixed for the save): MEASURED 0 batches in Chromium and Firefox
   (`LD-diagnostics-at-leave`; the control, the page kept 6 s: 1 batch).
   Diagnostics only, not the user's work.
-- **Not measured in a real browser** (the manual flow §41): a keepalive
+- **Not measured in a real browser** (the manual flow §46): a keepalive
   save outliving a closed tab on the real network, the CORS preflight of a
   keepalive PATCH against the real Supabase project, a phone's tab hidden,
   bfcache in Firefox and Safari (driven since review round 2 in Chromium
   only: restored on the production build, nothing lost), real Safari, and
   whether real Safari fails a save out before `beforeunload` on Back as
   Playwright's WebKit does (UNVERIFIED).
+
+### Queued by record 20 (the focus ring after a mouse click, 2026-10-16)
+
+Record `docs/fixes/20-focus-ring.md` section 10 has the detail and the
+evidence label of each.
+
+- **A mouse user's Enter and Esc never switch the ring on**, even when a
+  dialog then moves the focus (opening, or closing and giving it back to its
+  opener): the plan's rule, since record 20's correction 1 (review round 1,
+  R20-2: the first build's rule M3 drew it there, 6 of 6 in Chromium, as
+  main did; 0 of 6 after, MEASURED, `fit-check.mjs` `focus-dialog-mouse`).
+  If the owner wants a ring there, the rule needs a list of the keys that
+  navigate.
+- **A keyboard user who clicks once loses the ring** on the button the
+  keyboard reached until the next Tab, and Enter then acts on it with no
+  ring (MEASURED, R20-3, `focus-keyboard-then-press`, in each engine: a
+  click on A+, which keeps the focus where it was; main kept the ring). Keyboard-only users
+  lose nothing. The way out (pointer only when a press moves the focus)
+  needs its own measurement, WebKit's click included.
+- **WebKit no longer rings a mouse-opened dialog's focused button**
+  (MEASURED, `focus-dialog-mouse`: a ring on main, none after); opened from
+  the keyboard it still rings.
+- **Radios, sliders, colour wells, file inputs and other `[tabindex]`
+  elements** are outside record 20's selectors (buttons, `[role="button"]`,
+  links, checkboxes and, since R20-1, `<summary>`): no radio in the app, the
+  sliders and colour wells behind `ADJUSTMENTS_ENABLED`. Switching it on
+  brings two that ring after a click and Shift in Chromium, a slider and a
+  colour well (MEASURED, `focus-mouse-siblings` with the switch turned on
+  for the run: 2 of 17 elements on the fix, 10 of 17 on main): add
+  `input[type="range"]` and `input[type="color"]` to the pointer-mode rule
+  then (the committed sweep goes red the day the switch goes on).
+- **Not measurable from the browser harness** (R20-6): Tab from the
+  address bar into the page after a click in it shows no ring on that one
+  stop until the next Tab (UNVERIFIED); the window getting the focus back
+  after a click and a key is pointer (TESTED in jsdom). Manual flow §45.
+- **Found in passing (older than record 20): the dashboard's Duplicate and
+  Delete are invisible to a keyboard user.** Their row is drawn at opacity
+  0 until the card is hovered (`components/PosterCard.tsx`), so the ring a
+  Tab gives Delete is painted at opacity 0: 0 ring-coloured pixels against
+  1538 on a template tile (MEASURED, `focus-dialog-keyboard`
+  `openerPaintPx`, Chromium, main and the fix alike). A `focus-within`
+  reveal would show them (UNVERIFIED: not tried).
+
+### Queued by record 39 (text editing like PowerPoint, 2026-10-16)
+
+Record `docs/fixes/39-text-editing.md` section 10 has the detail and the
+evidence label of each.
+
+- **x² and x₂ for the next letters typed** (PowerPoint's keys with only a
+  caret switch the format of what is typed next): not built; with only a
+  caret the keys are taken in text and do nothing, and the bar shows only
+  over a selection. Typing right after a subscript at a block's end
+  continues it (MEASURED in Chromium, Firefox and WebKit,
+  `keep-work-check.mjs` `TE-I-type-after-sub`: "ZQCO<sub>2 ZQNEXT</sub>"),
+  as word processors do; the way out is to select it and press x₂. The
+  engines' typing style reads the computed `vertical-align`, which the
+  page's base style sets to `baseline` for sub and sup (record 39 §6), so a
+  caret toggle needs its own design.
+- **The keys in a real Windows browser**: in Playwright's three engines the
+  page receives Ctrl + Shift + = and Ctrl + = and cancels them in text
+  (MEASURED); whether Chrome, Edge or Firefox on Windows zoom the page before
+  the page can cancel is UNVERIFIED (Playwright's keys reach the page only:
+  `TE-I-zoom`, ⌘ + = zoomed nothing). Manual flow §42.
+- **Keyboard layouts where = needs Shift** (German Shift + 0): the editor
+  reads the "=" and "+" characters or the physical = key, so on a German
+  layout Ctrl + the "+" key (unshifted) is subscript, Ctrl + Shift + 0
+  superscript, and Ctrl + the ´ key on the US = key's place subscript; on a
+  French one Ctrl + = subscript (MEASURED with dispatched keydowns, not a
+  real keyboard, `keep-work-check.mjs` `TE-I-layouts`, three engines;
+  record 39's first version said subscript had no key there, which the
+  review's R1-F4 found false). Ctrl + "+" is also German Windows browsers'
+  zoom-in, cancelled in text, the same trade as Ctrl + = on a US keyboard.
+  What PowerPoint does on those layouts is UNVERIFIED.
+- **"/" right after an opening bracket, a quote, an emoji or CJK text
+  opens no menu** (the review's R1-F7, MEASURED by the reviewer in three
+  engines; the rule T4 as written: a space, a line start or the block's
+  start): "(α)" and "[β]" need a space typed and deleted, and CJK text,
+  written without spaces, the same. An owner question for later: whether
+  an opening bracket or quote counts as a word start
+  (`matchSlashAtCaret` would take `(?:^|[\s(\[{"'“‘«])`); none of the
+  design doc's in-word examples ("n/a", "w/", "μg/d", "see Fig. 2/") would
+  open it.
+- **"/al", ←, Tab gives "αl"**: the menu reads the prefix up to the caret
+  ("/a"), so a symbol inserted with the caret inside "/al" leaves the
+  letters after it (the reviewer's R12 in three engines; the same on main,
+  INSPECTED). Not changed.
+- **The keys in table cells, captions and sidebar fields** stay the
+  browser's (Ctrl + = zooms a Windows browser there); the format bar is not
+  shown there either (INSPECTED).
+- **The format bar's buttons act on a mouse press only** (`onMouseDown`, as
+  B, I and U always did): a keyboard user reaches superscript and subscript
+  through the keys (INSPECTED; the bar disappears when the focus leaves the
+  text).
+- **⌘/Ctrl + Space**, PowerPoint's clear character formatting: not built;
+  the bar's Clear does it.
+- **The PowerPoint file's subscript baseline is -40000** (pptxgenjs's
+  value; MEASURED, `TE3x`), deeper than PowerPoint's own subscript
+  (UNVERIFIED in PowerPoint: the manual flow §42 opens the file).
 
 ### Queued by record 36 (select and move like PowerPoint, 2026-10-16)
 
@@ -1488,7 +1647,7 @@ evidence label of each.
 Record `docs/fixes/34-paste-drop.md` section 10 has the detail and the
 evidence label of each.
 
-- **Undo after an image is replaced by a file of the same type** draws
+- ~~**Undo after an image is replaced by a file of the same type** draws
   the new image in the old box, and a reload gives the block its shape
   again (MEASURED, `canvas-paste-check.mjs` D-on-image, information):
   files are stored per block id and an upload overwrites (bounded-designs
@@ -1496,7 +1655,11 @@ evidence label of each.
   name per upload; it also covers Preview, the print window and an export
   drawing a cached old file after a same-type Replace in the same session
   (INSPECTED; on main Firefox and WebKit kept drawing the old picture on
-  the canvas too, I-replace-button).
+  the canvas too, I-replace-button).~~ **Answered by record 35**: every
+  upload writes a new name (`{block}-{random}.{ext}`); one ⌘Z after a
+  same-type Replace draws the old picture (MEASURED in three engines,
+  `C-replace-undo`, DU 0 of 1); Preview, print and export sign the new
+  path (INSPECTED).
 - **Nothing shows while a pasted or dropped image uploads** (the block
   appears once stored; MEASURED with the upload held 2.5 s, B3-slow).
   Raised by its review round (R34-4, MEASURED in three engines): a second
@@ -1533,13 +1696,127 @@ evidence label of each.
   copied in the Finder or Explorer) and a real Firefox's image paste:
   UNVERIFIED; the manual flow §39 has the checks.
 
+### Queued by record 35 (block copy, cut and paste; image files, 2026-10-16)
+
+Record `docs/fixes/35-block-copy.md` section 10 has the detail and the
+evidence label of each.
+
+- **Files no block uses stay in storage**: one per Replace (MEASURED, 3 →
+  4 files in the poster's folder after one Replace), one per pasted copy
+  later deleted or undone. The orphan-files fix must NOT assume one file
+  per block: older ⌘D clones, a ⌘D clone whose copy failed (record 35
+  R1-3), a pasted image whose copy storage could not make just then,
+  which keeps its source's file, possibly in another poster's folder
+  (record 35 R3-1; also when the other poster is left or reloaded while
+  the copy is out, and a copy completing then is used by no block: the
+  final check's F35-FC-3, MEASURED with the checker's probe), a dashboard
+  Duplicate, saved versions and undoable states share files (since record
+  35 R3-3 a copy brought back by ⌘⇧Z, or by a ⌘Z of a step made while it
+  was copied, holds its own file; until then it shared its original's,
+  R2-1). A copy try whose answer was lost but which made its copy leaves
+  that copy unused (record 35 F35-FC-1, correction 4). Since record 35's
+  correction 5 a pasted image or a ⌘D clone whose copy storage refused for
+  a reason not about the file (a 403, an expired token, a 409, a 404 after
+  a busy try) also keeps sharing its source's file, possibly in another
+  poster's folder, until a later Replace gives it its own name (F35-FC-3's
+  shape). Files referenced by any poster's blocks or saved versions are
+  never deleted. Before deleting a file it must count the references to it
+  across all of the account's posters, saved versions and undoable states
+  (record 35 §9, R1-6). A deleted poster's folder is left as before.
+- ~~**A copy storage refuses for a reason not about the file empties a
+  pasted image showing the user's own file** (record 35's final check,
+  F35-FC-2, LOW, MEASURED with the checker's probe in Chromium and Firefox
+  against the fake storage: a 403, a 503 then 400 `InvalidJWT`, a 503 then
+  a 404 while the file is there; a figure cut in one poster and pasted in
+  another is then lost from both, nothing deleted), while ⌘D keeps its
+  original's file on the same failures. The lead's call on R3-1's rule:
+  for a source in the user's own folder, empty only when storage says the
+  source is not there (a 404 / `not_found`), else keep it as for a busy
+  copy; or sign the source once before emptying it.~~ **Answered by record
+  35's correction 5** (the lead's decision, the first option): for a pasted
+  image or a ⌘D clone whose source is in the user's own folder, the block
+  is emptied, with the "couldn't be copied" toast, only when storage's
+  first answer says the file does not exist (statusCode 404 with storage's
+  "not found"); every other refusal or failure keeps the source, with no
+  toast; another account's file or a source that is not a storage path is
+  unchanged (a pasted one empty, with the toast). MEASURED with the
+  folded-in `C-fc-` scenarios (record 35 §9). How often real storage
+  refuses a copy of the user's own existing file is still UNVERIFIED.
+- **The `.postr` import has no table bounds and no totals** (record 35
+  R1-1's sibling, INSPECTED): give it the paste's bounds (a table at most
+  500 rows, 50 columns, 2 500 cells; 2 500 cells in all). **No poster-size
+  cap exists** (the reviewer's grep): a poster made of many tables by hand,
+  or written by another route, is drawn and saved whatever its size.
+- **The browser's Edit › Copy and Edit › Cut menu items do not copy
+  blocks** (only ⌘C / ⌘X do; Edit › Paste pastes them): a document `copy`
+  / `cut` listener could serve both (record 35 R1-7, INSPECTED). A focused
+  slider or checkbox counts as edit mode for ⌘C (record 34's `isEditing`).
+- **A pasted, dropped or uploaded image still waits for its upload before
+  its step lands** (record 34's R34-4, MEASURED there: a ⌘Z pressed
+  meanwhile undoes the step before, which ⌘⇧Z cannot bring back). Record
+  35's review round 2 answered the same cause for copies (R2-1, MEASURED in
+  three engines: ⌘D's clone and ⌘V's copies now go in at once and take
+  their own files silently, `settleCopiedFiles`); an upload has no stored
+  path to show meanwhile, so it needs a placeholder that is never stored
+  (its preview), then the same silent fill.
+- **"My Logos" stores a signed address that expires after an hour** as the
+  logo's picture (`LogoPicker` `handleMyLogoClick` → `logo.signedUrl`;
+  INSPECTED, a defect on main found in passing): the logo would draw
+  nothing an hour later. Store the library file's path (or copy it into
+  the poster's folder) instead.
+- **Insert › Logo can select the locked credit mark** instead of adding a
+  logo, and **⌘D clones a user logo** (a second logo): the one-logo rule
+  lives in Insert's check, which does not skip locked blocks, and not in
+  ⌘D (bounded-designs §3.2; INSPECTED). The paste's rule (`blockClipboard.ts`
+  `admit`) already skips the mark and refuses a second logo; Insert and ⌘D
+  could read the same rule.
+- **A note, a caption and table cells are drawn as stored**
+  (`dangerouslySetInnerHTML`, `asIs`): every writer cleans them (the
+  editor, the `.postr` import, record 35's paste), but a row written by
+  another route would be drawn unsanitized (INSPECTED; sharing is hidden).
+  A render-time sanitizer for those fields.
+- **Repeated ⌘V of one copy** lands each set at the same +1 in (PowerPoint
+  offsets each paste further, `PPT?`).
+- **Charts are not copied** (hidden, D1): a chart's spec would need its own
+  validator before a pasted one reaches the Figure tab's R and Python code.
+- **The block payload's HTML carries each image's storage path** (with the
+  account's id) to any application that keeps HTML attributes: a plain
+  editable field with no paste handling of its own kept the attribute
+  (726 characters, holding the account id) in Chromium, Firefox and WebKit
+  (MEASURED, record 35 R2-4, `C-r2-i-other-apps`); whether Word, Docs or
+  Gmail keep it is UNVERIFIED; the bucket is private (INSPECTED). A
+  document that kept it and is copied back onto the canvas would paste the
+  original blocks, not the words (INSPECTED, UNVERIFIED in a real
+  application). Writing only what the paste needs is a design decision
+  (the full path is what lets a copy reach another poster).
+- **Another application's paste of copied blocks** (Word, Google Docs,
+  e-mail) and a real browser's copy event with nothing selected (Safari)
+  are UNVERIFIED; the manual flow §43 has the checks.
+- **"These blocks are too large to copy." for a block whose id fails the
+  payload's check** (record 35 R3-5, INSPECTED): Postr writes ids the
+  check accepts, but the `.postr` import keeps an imported id as written
+  (`sanitizeImportedBlock`), so ⌘C of such a block says it is too large.
+  Normalise the id when it is copied (the paste gives a new id anyway;
+  the +1 in test reads the original's id), or word that toast.
+- **`migrateBase64ToStorage` can drop edits made while it uploads**
+  (`pages/Editor.tsx`; record 35 review round 3, the reviewer's INSPECTED,
+  not measured, pre-existing): it sets blocks taken from the poster as it
+  was at load once its uploads finish, so on a poster that still holds
+  data-URL images an edit made meanwhile (a paste included) could be
+  lost. Apply its paths to the poster as it is then (as record 35's
+  `withCopiedFiles` does).
+
 ### Queued by record 33 (text size, 2026-10-10)
 
 Record `docs/fixes/33-text-size.md` section 10 has the detail and the
 evidence label of each.
 
-- **For the lead and the owner: a level raised by A+ past the editor's
-  load-time ceilings is reset on the next open.** The editor page replaces
+- **Done by record 37 (`docs/fixes/37-load-size-cap.md`, 2026-10-16):**
+  the editor page now recognises an old poster by the old default's four
+  sizes together and keeps every other size as stored (RELOAD, RELOADSTYLE,
+  RELOAD12, RELOADONE clean in three engines). The entry as queued:
+- ~~**For the lead and the owner: a level raised by A+ past the editor's
+  load-time ceilings is reset on the next open.**~~ The editor page replaces
   a level above a ceiling (`pages/Editor.tsx` `normalizeStaleStyles`:
   title 216, heading 100.8, authors and body 72 pt) with today's default
   when it opens a poster, taking it for an old document's broken default.
@@ -1598,6 +1875,110 @@ evidence label of each.
   "5" stores 5 pt, below the field's own minimum of 12. Record 33 now
   handles a body of 0 (A+ sets 28 pt, the label reads "Body – pt"); the
   field itself is unchanged.
+
+### Queued by record 37 (text sizes kept when a poster reopens, 2026-10-16)
+
+Record `docs/fixes/37-load-size-cap.md` section 10 has the detail and the
+evidence label of each.
+
+- **An emptied poster gets the starting template and the Classic palette
+  back on the next open** (a sibling of record 37's pattern, a load-time
+  repair keyed on something a user's own poster can also be; not the same
+  cause, and not changed there; MEASURED, `text-size-check.mjs`
+  `reload-emptied-user-filled` and `reload-emptied-tpl-3col`, Chromium,
+  Firefox and WebKit): every block deleted with "Delete block" (no credit
+  mark was placed on either poster, so none was left), "Nature / Biology"
+  picked, saved (the backend holds 0 blocks), reloaded: 14 blocks, the
+  3-column template, and the palette Classic again. `pages/Editor.tsx`
+  `hydrateIfEmpty` lays out the template for any stored poster with no
+  blocks, which a row the database has just created and a poster its user
+  emptied share. Their other values differ (corrected after record 37's
+  review round 1, R37-2; MEASURED `text-size-check.mjs` `new-row-defaults`
+  and `new-row-emptied`, Chromium, Firefox and WebKit): a new row holds the
+  posters table's column default (title 22 units, authors line height 1.5,
+  the palette with accent #0f4c75; next item), and a new poster emptied
+  with "Delete block" in today's editor differs from it only in its
+  palette (Classic, accent #1a80bb, written by its first save). A bounded
+  rule needs a decision, one of three: lay out a template only for a row
+  never saved by the editor (for example `updated_at` equal to
+  `created_at`, UNVERIFIED that every write moves it); only for a row
+  whose data equals the column default (it separates the two today; not a
+  poster emptied and saved before `c0af001`, 2026-07-28, while Classic was
+  the column default's palette, its styles untouched, INSPECTED; and not
+  once the next item is fixed by inserting today's defaults); or keep the
+  palette and only add blocks. MVP impact low (an empty poster is rare;
+  nothing typed is lost).
+- **A new poster does not start at the editor's defaults** (record 37's
+  review round 1, R37-1, MEDIUM; older than record 37 and not caused by
+  it: MEASURED `text-size-check.mjs` `new-row-defaults` in Chromium,
+  Firefox and WebKit, the same with record 37's change taken back,
+  `K1-ceilings-back`, Chromium; the reviewer read the same on the
+  production build, UNVERIFIED here). `data/posters.ts` `createPoster`
+  inserts only `{ user_id }`, so a new row's `data` is the posters table's
+  column default, which the migration file holds as title 22, heading 8,
+  authors 5, body 5 units, authors line height 1.5 and April's Classic
+  palette (`supabase/migrations/20260408000100_posters.sql`, under its own
+  comment "Keep these in sync with DEFAULT_STYLES"; no later migration
+  changes it). The client's `DEFAULT_STYLES` moved on twice without it:
+  the authors line height 1.5 → 1.15 (`6ded272`, 2026-04-11, the extra
+  spacing a user reported; a new poster's 1.5 is drawn at 1.2 by the
+  authors block's own clamp, `blocks.tsx` `Math.min(1.2, …)`, INSPECTED)
+  and the title 22 → 14 units "for a less-overwhelming default"
+  (`81e1699`, 2026-04-27). `hydrateIfEmpty`
+  replaces the palette, not the styles, and record 37's rule keeps them,
+  so a guest's first `/p/new` draws the title at 158.4 pt, the field
+  reading 158 (the dashboard's "+ New poster" calls the same
+  `createPoster`, INSPECTED). bounded-designs §3.7's A± arithmetic
+  assumes 100.8: on a new poster the title runs 123.2 to 211.2 pt over the
+  body's sizes, not 78.4 to 134.4 (4.4 × the body, not 2.8 ×;
+  arithmetic). The fake backend copies the migration file
+  (`fakeCopiesMigration` true); production's default was not read
+  (UNVERIFIED; at the old default, 60 units, the editor repairs a new
+  poster to today's sizes on open). A bounded fix: `createPoster` inserts
+  a document built from `DEFAULT_STYLES`, `DEFAULT_PALETTE`,
+  `DEFAULT_FONT_FAMILY` and `DEFAULT_HEADING_STYLE` (one source; the
+  column default no longer used by the app), a unit test entered at
+  `/p/new` that the new poster holds `DEFAULT_STYLES`, and
+  `new-row-defaults` made a claim; optionally a migration setting the
+  column default to the same, with the fake's `DEFAULT_DATA`. It removes
+  the previous item's second rule. For the lead: it touches every new
+  poster, and it is a cause of its own (where a new poster's data comes
+  from), so a branch of its own, not record 37's.
+- **A poster holding three of the old default's sizes and one changed by
+  hand now opens as stored** (record 37's rule: all four or none;
+  INSPECTED reachable only between autosave, 4e3190c, and the repair,
+  979df80, about 30 minutes on 2026-04-09 on the owner's local database;
+  MEASURED information `old-default-one-edited`: 60 / 28 / 22 / 9 units
+  draws 432 / 201.6 / 158.4 / 64.8 pt, where the ceilings reset three of
+  them). No change proposed.
+- **A database whose posters table was made by the migration as first
+  written** keeps the old column default (a migration edited in place is
+  not run again), so its new rows start at the old default; the editor
+  still repairs them on every open, and the next edit writes the repair
+  (INSPECTED; production's column default was not read: record 37 works on
+  the fake backend only). A database built from the migration file as it
+  is now starts them at title 22 units instead (the item above). Worth one
+  read-only check of `information_schema.columns` on production before
+  launch.
+- **The share page draws a stored poster as stored**, old default included
+  (432 pt title), while the editor repairs it (INSPECTED, `pages/Share.tsx`
+  calls no `normalizeStaleStyles`; sharing is hidden, `SHARING_ENABLED`).
+  Before record 37 the two also disagreed on every size above the old
+  ceilings; now only on the old default.
+- **A reload inside the autosave's 800 ms window** (record 37's review
+  round 1, R37-6, INFO; UNVERIFIED: the reviewer's harness, not
+  re-measured): the heading typed to 120 pt and the page reloaded 150 ms
+  later, the leave prompt accepted: the poster reopened with the old
+  heading and no data save reached the fake backend in 5 of 6 runs (the
+  dev server in Chromium, Firefox and WebKit, the production build in
+  Firefox and WebKit; the production build in Chromium saved), and Firefox
+  reported no leave prompt to Playwright. Not record 37's cause (the
+  autosave's flush on `beforeunload`, `hooks/useAutosave.ts`). For the
+  lead: a probe of its own in `keep-work-check.mjs` (whose leave-warning
+  scenarios close the tab 3 s after the edit, outside the window:
+  INSPECTED, `lib/keepWorkSave.mjs` S4), against a real local server
+  if possible, before deciding whether it loses work a user did not agree
+  to lose (whether a real Firefox shows the prompt there is not known).
 
 ## LaTeX export: before it is switched back on
 
@@ -1667,7 +2048,7 @@ Found while fixing one item, belonging to another (details in the record named):
   shrank instead (−124 px with main's open panel → −61.5 px), because the
   panel now starts closed. On the filled axis it is the bar's 24 px, before
   and after. Item 4 must re-measure at the shipped defaults. `fit-check.mjs` claim Hr
-  guards the filled axis at 24 px; item 4 must update that guard. (Since 2026-09-30 the rulers are hidden, `RULERS_ENABLED`; Hr measures nothing and the run says so.)
+  guards the filled axis at 24 px; item 4 must update that guard. (Since 2026-09-30 the rulers are hidden, `RULERS_ENABLED`; Hr measures nothing and the run says so.) **Done by item 4 (2026-10-16, record 04 §11):** re-measured at the shipped defaults on main `ac7d793` with the switch on (at 1280 × 800, +24 and −39.5 px), and Hr now guards both 0" marks at 0 within 0.5 px plus 1/64 px after Fit.
 - **Item 3**, same review: zoom-to-fit leaves 36 px of the limiting side out
   of view, and Zoom out zooms IN below its 0.3 floor. **Fixed by fix 03.**
 - **From fix 03** (a summary; record 03 section 10 is the complete list,
@@ -1819,7 +2200,7 @@ Found while fixing one item, belonging to another (details in the record named):
 | 2 | `editor/custom-sheet-size` (causes A, E), `editor/size-change-keeps-blocks` (B–D) | done — `docs/fixes/02-poster-size.md` |
 | 3 | `editor/fit-whole-sheet` (A, B), `editor/guidelines-closed-small-screens` (C, D, and A and B's review follow-ups) | done — `docs/fixes/03-fit-whole-sheet.md`; the owner answered its questions on 2026-09-30 (items 19–22; Firefox and WebKit engines installed) |
 | 23 | `fix/new-poster-owner-only` | done — `docs/fixes/23-new-poster-owner-only.md`; sharing and comments hidden (`SHARING_ENABLED`) |
-| 4 | `editor/rulers-match-sheet` (local, parked) | hidden — the owner hid the rulers on 2026-09-30 (`RULERS_ENABLED`, `config/features.ts`); the fix is parked unmerged with its record, instruments and open review findings |
+| 4 | `fix/04-rulers` (the parked `editor/rulers-match-sheet` brought onto main `ac7d793`) | implemented and shown again (`RULERS_ENABLED = true`; un-parked by the owner 2026-10-16, "start them now") — `docs/fixes/04-rulers-match-sheet.md` §11: reproduced on main with the switch on (every scenario off, up to 875 px; in three engines), then 0 marks over 0.516 px at rest and 0 stale frames of 102 events per engine (1024, 1280 and 1920 px, the sidebar shown and hidden), the marks placed by layout (decided by the painted ticks), the copies free of rulers. Review round 1 (2026-10-17, §11.9): R1-F1 fixed (at a browser zoom of 90 % or 110 % the painted 0" sat a device pixel off; the layers now round their place on the screen, not in the bar), R1-F3 fixed (File › Print of the editor page hides the rulers), R1-F4's stale sentences corrected, R1-F5's judge limit made half a device pixel at any ratio; R1-F2 recorded (Firefox's paint cannot be judged); corrected, its re-review is next |
 | 13 | `checker/python-reads-own-fix` (part 1), `fix/13p2-checker-sizes` (part 2, stream P: 13b; stream Q, 13c, merged in, next row) | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md`; part 2 implemented, review rounds 1 (17 findings: a tight save cut what it drew outside the plots, a `fontdict=`/`prop=` overwritten so the script raised, R theme order, `theme_void()`, a theme that is not ggplot2's, `ggsave(filename = …)`, `**kwargs`, and more) and 2 (13 findings: an R figure combining plots themed as a whole, a blank image for gridExtra; a panel letter replacing the centre title; a size the check cannot read pinned at the default and lowered; R names with a comment; PdfPages; colorbars seaborn and pandas make; sup-labels; legend guides; png() devices; advice from rows not drawn; `%+replace%`; loops over Axes) and 3 (5 findings: a theme held in a name or a function dropped from a combined figure's plots and base 11 written over it; the floor on a string font.size, an import above `from __future__`, `FontProperties as FP`; a passing unread size left unfloored; a plot drawn on its own line in a device, `grid.arrange()`, ragg; a cut legend at 4 × 3 in, accepted) done and answered — `docs/fixes/13b-checker-sizes.md` (the owner's design of 2026-10-07: a bounded rule table read by position, the last setting winning; a size or canvas the code leaves out marked `*` and set in the script the page asks you to use in place of yours; plain edits instead of part 1's helper. On the corpora with every review scenario, 116 Python and 61 R scripts × 4 sizes in real matplotlib, seaborn and ggplot2: first-check false passes 201 → 0 unmarked (Python; 10 on rows marked `*`) and 126 → 0 unmarked (R; 6 marked), re-check false greens 151 → 0 and 141 → 0, scripts whose fix leaves a text short or does not run 31 → 0 and 51 → 0, texts cut from the image 0 → 0, false fails 151 → 16 and 86 → 22 (rows marked `*`); R sizes written below what ggplot2 draws 68 → 0 (R texts printed smaller 78 → 15, all from a canvas the check cannot read, set to the size checked); Python 0 → 5, pass to pass: two seaborn grids at 14 × 10 in, an owner question, and a reset inside an `if`) |
 | 13 part 2, stream Q (13c) | `fix/13p2-chart-text` | fixed; its one review round (the browser, the user's entry points, the print path) answered: Q-R1 to Q-R5 held and are corrected (text measured in the chart's font, Plot's tick labels read back for the margins and spacing, legend and long labels wrapped inside the chart, each band holding its label's lines, a chart too small for its text at the minimums growing its block, "⎙ Save PDF" stripping the editor's chrome), Q-R7's cause found (a 1.5 px border the editor draws 1 px wide and the print 1.458 units), the rest on the Later list; re-measured in Chromium, Firefox and WebKit on the review's partition folded into the harness, 48 of 48 mutants killed, 10 blind spots guarded in the browser and 1 accepted; one more round is the lead's call (the corrections add mechanisms) — `docs/fixes/13c-chart-text-minimums.md` (one module of minimums for figure text, read by the code check's tables, the image scan and the charts; an inserted chart is drawn at the box it is laid out in, text at 18/24 pt never rounded and never below 14/18 (its floor 0.5 % above them, for print's rounding); chart blocks have an image's caption chrome, so the caption and its "Sample data, not real results." prefix show whole; in each of Chromium, Firefox and WebKit 0 of 1706 chart-sizes below the minimum, clipped, colliding or printed differently, from 408, 1705, 1077 and 18 on main in Chromium; 99 of 1706 grow their block, all at 6 × 4.5 to 8 × 6); the queued items above |
 | 7 | `fix/07-figure-script-kept` | done (three review rounds); review round 1 answered (a blank-line regression fixed, tests added, legal copy corrected); round 2 answered (a result checked against an image block is no longer shown under the preview's size, and a kept result says the size it is for; a long script edited after its Check stays stored); round 3 answered (a note no longer promises an image check comes back) — `docs/fixes/07-figure-script-kept.md`; the owner's decisions of 2026-10-06: the script kept per poster in this browser and re-checked on return, sessionStorage on the public page, Check stays up once a script is in, and the same cause fixed in the Authors, References, Make-a-figure, poster-name and version-name drafts (memory only) |
@@ -1837,5 +2218,11 @@ Found while fixing one item, belonging to another (details in the record named):
 | 32 (MVP: pasting tables; fix 27's N2-F1) | `fix/table-paste` | implemented; its one review round (a simple feature: the browser, through the user's entry points, on `tablepaste-frozen-1`) done and corrected (6 findings: R1-F1, R1-F2 and R1-F3 MEDIUM corrected, each reproduced first with the committed instrument in the three engines and then 0; R1-F4 LOW, the table tip corrected to say a single copied cell replaces the cell's text, the behaviour queued for the owner; R1-F5 LOW, two docs corrected; R1-F6 INFO queued; the corrector's audit of its own correction found it lost a Shift+Enter line and a double space copied between blocks in Firefox, MEASURED, and corrected it); the correction is for the next lead pass, frozen copy `tablepaste-frozen-2` — `docs/fixes/32-table-paste.md` (bounded-designs.md §3.3 A, the lead's rule table, PowerPoint's behaviour): one line of text pasted into a table cell goes in at the caret; a grid (an HTML table from Excel, Word or Sheets, or text with tabs or line breaks) fills the table from the focused cell, across and down, growing it by rows and columns, no cell outside the pasted area changed, nothing dropped (merged cells keep the cells after them in their columns), one undo step; a paste into a text block or the title takes the poster's style (the source's colour and highlight dropped with its font and size; a style sheet's text and Google Docs' non-bold `<b>` wrapper dropped); a pasted cell's text stored as text. Reproduced from the user's entry with a real ⌘C/⌘V in Chromium, Firefox and WebKit (`scripts/table-paste-check.mjs`, on main: rule 1 broken in 3 of 3 scenarios, the table replaced by the grid in 12 of 12 grid scenarios, wrong in 11 (the twelfth covers the whole table from its first cell), an `<img onerror>` pasted as text ran in 2 of 2, colour or a style sheet's text kept in 4 of 5 text pastes; after: 0 in each engine, and on the production build in Chromium); after the review round: Word's own bold kept (`<b style='mso-bidi-font-weight:normal'>`: the not-bold check read any "font-weight: normal" in the style, so Word's bold was dropped in text blocks, a regression against main, and in cells), blank lines at the end of a paste no rows and rule 1's line ending with no line break (a paragraph Chromium copied with a triple-click emptied the cell below; WebKit added a blank line), a line wrapped in the clipboard's HTML source one line in cells, text blocks and the title, while text copied between blocks keeps its line breaks and spaces; the instrument's 30 scenarios 0 in each engine and on the production build in Chromium; 54 of 54 mutants killed; the three in-app sentences about pasting tables say what the paste does; queued above: "Queued by record 32" |
 | 33 (MVP design §3.7, owner decision D2) | `fix/text-size` | implemented — `docs/fixes/33-text-size.md`; the first build's tree (on `1d5addf`) was lost before it was committed, and the build was recovered from the author's transcript onto `c67a3db` (record 33 §9: nothing re-implemented; byte-identical to the first build wherever a copy survived) with every number below measured again there; reproduced first in Chromium, Firefox and WebKit (`text-size-check.mjs`: no text-size control in the top bar; raising every level one step took the Style tab's 4 fields and 4 undo steps, the ratios drifting up to 1.01 % and a round trip ending the title at 101 pt from 100.8, MEASURED); built: [A−] Body 36 pt [A+] in the top bar between Redo and Save PDF (`poster/TextSizeControl.tsx`, rules `poster/textSize.ts`): the body steps through 28 · 32 · 36 · 40 · 44 · 48 pt, title, heading and authors keep their ratio, unrounded, every return to a size exact (`===`, from an anchor: the naive new ÷ old formula missed on 4526 of 4549 swept walks), one undo step per press, the caret kept on a mouse press, the focus kept and the selection's keys blocked on a keyboard press, disabled at the bounds with a title saying why; the Edit tab's note names it; Auto-Arrange still never changes a size; after: every claim clean in three engines (13 posters, 147 presses, 65 returns to a size all `===`; the print document and the PowerPoint file at the new sizes; the top bar without overlap at 1024 and 1280 px); 25 of 25 mutants killed, 3 blind spots guarded in the browser; a sibling found and queued for the lead and the owner (a level set large and raised with A+ past the editor's load-time ceilings is reset on the next open, older than record 33: the Style tab reaches it too, MEASURED); its one review round (a simple feature: the browser, through the user's entry points, on `textsize-frozen-1`) done and corrected (6 findings: R1-F1 MEDIUM, a body that is not a size, the Style tab's Body field cleared stores 0 and left A+ promising 28 pt and doing nothing, and R1-F5 LOW, a title stored as null written as 0 by a press, one cause, corrected: such a body counts as below every size, A+ sets it to 28 pt and leaves the other levels, the label reads "Body – pt", another level that is not a size is left alone; reproduced first with the folded-in scenarios, OBSERVED in Chromium, Firefox and WebKit, then clean; R1-F2 MEDIUM, one A+ from a body typed at 12 pt resets title, heading and authors on reopen, left to the lead and the owner, queued above with the record corrected; R1-F3 LOW, two round trips 1 to 2 units in the last place off, measured and queued; R1-F4 LOW, the label near a size, an owner call; R1-F6 INFO); after: 46 scenarios clean in each engine, 32 of 32 mutants killed, 3 blind spots guarded; the correction is for the next lead pass, frozen copy `textsize-frozen-2` |
 | 34 (MVP: paste and drop on the canvas) | `fix/paste-drop` | implemented and reviewed (one round, a simple feature: the browser, through the user's entry points, on `pastedrop-frozen-1`; 10 findings, 2 MEDIUM, 6 LOW, 2 INFO, record §9): corrected R34-1 (a second file put into an image block while the first uploads drew nothing until a reload: only the last file now updates the block), R34-2 (an image with an `<img>` fragment and its address as text pasted nothing: "text" is now what a paste into a text block would insert), R34-3 (a dragged cell range then ⌘V made a stray block in Chromium: the canvas waits) and R34-7 (a paste behind the feedback dialog made a block: the dialog is marked modal), each reproduced first in the browser in three engines and red first in a unit test; R34-4 and R34-6 queued below; after: the instrument green in Chromium, Firefox and WebKit, 50 of 50 mutants killed, 3 of 3 blind spots guarded; the correction is in the frozen copy `pastedrop-frozen-2` — `docs/fixes/34-paste-drop.md` (bounded-designs.md §3.3 table A row 3, table B orders 2 to 5, Drop, Image checks; order 1, Postr's own copied blocks, is the next fix): ⌘V with nothing in edit mode makes a table block from an HTML table (record 32's reader), an image block from an image with no text (or fills the selected empty image block), a text block from any other text (record 32's cleaned paste), nothing otherwise, centred in the part of the sheet in view, snapped to the ½ in grid; an image pasted into a text block, a heading or the title makes an image block to its right, or below it as drawn; image files dropped on the canvas make image blocks centred on the drop point, each next 1 in down and right, and one dropped on an image block goes into it; non-images and files over 10 MB skipped with today's messages; every paste or drop one undo step; a paste into a field or with a dialog open makes nothing; a guest the same. Reproduced first from the user's entry (`scripts/canvas-paste-check.mjs`, real ⌘V where the engine allows it, trusted drops in Chromium) on a clean tree of `c67a3db` in Chromium, Firefox and WebKit: nothing happened in any row (B2 2/2, B3 7/7, B3F 1/1, B4 4/4, A3 3/3, DR 3/3, DM 1/1, DI 3/3, G 2/2; Chromium fired no `drop` at all), and the image block's own upload took three undo steps, stored a `blob:` address while the upload was out and kept a broken figure for a file over 10 MB (UP, UPB, UPX, the path a fill and a drop share, fixed with it: one update after the file is stored); after: every claim 0 in each engine and on the production build in Chromium; 43 of 43 mutants killed, 5 of 5 blind spots guarded in the browser; §3.3 D measured and left to the next fix (⌘Z after a same-type replace draws the new image); queued above: "Queued by record 34" |
+| 35 (MVP: block copy, cut and paste; §3.3 D image files) | `fix/block-copy` | implemented, then corrected after review round 1 (stage "correction 1": 7 findings, 3 MEDIUM, 3 LOW, 1 INFO, each reproduced from the user's entry in three engines and corrected, record §9; the ⌘X rule for a picture that cannot travel, R1-2, was decided by the corrector and awaits the lead; then review rounds 2 and 3 and "correction 2" and "correction 3", below) — `docs/fixes/35-block-copy.md` (bounded-designs.md §3.3 table B order 1, table C, D): ⌘C / Ctrl+C with blocks selected and nothing in edit mode puts a versioned payload of the blocks (HTML with `data-postr-blocks`) and their words (plain text) on the system clipboard; ⌘X copies, then deletes as Delete does (the credit mark stays, with its toast); ⌘V pastes copies with new ids 1 in down and right of their originals while an original is on the poster, else at their places (another poster, another tab, after a reload or a cut), each kept on the sheet, in one undo step; a title, an authors block or a user logo the poster has is refused with a toast; the payload is validated strictly and cleaned (a payload that fails pastes nothing, with a toast); every upload and Replace writes a new file name, and ⌘D's clone and each pasted image get their own file (a storage copy); a pasted file storage refuses to copy (another account's, a missing one) gives an empty block and one toast, while ⌘D's clone keeps its original's file when its copy fails (R1-3) and, since review round 3, a pasted image keeps showing its own-folder source when storage is busy on every try (R3-1); charts are not copied. Reproduced first from the user's entry (`scripts/canvas-paste-check.mjs --only C-`: real ⌘C, ⌘X, ⌘V, ⌘D, Replace, a reload, another poster, a second tab, a guest) on a clean tree of `2b94b5a` in Chromium, Firefox and WebKit: ⌘C and ⌘X did nothing (C1 3/3, C2 2/2), ⌘V made a text block of the old clipboard's words (C3 5/5, C5 3/3, B1N 9/9), ⌘D's clone shared its original's file and a Replace overwrote it, so after a reload the clone drew the new picture (D 6/6, R 2/2, DR 1/1), and one ⌘Z after a same-type Replace drew the new picture (DU 1/1); after: every claim 0 in each engine (and record 32's, record 34's and record 12's instruments green on this tree; record 32's found a defect of the first version, a ⌘C taken from text the user had selected in the sidebar, corrected, record §9); 55 of 55 mutants killed; web suite, tsc and the production build pass. Review round 1's corrections: the payload's tables at most 2 500 cells together (R1-1); ⌘X leaves a picture ⌘V could not bring back, with a toast (R1-2); ⌘D's clone keeps its original's file when the copy fails, and older `{block}.{ext}` names copy (R1-3); ⌘C / ⌘X write only a payload ⌘V accepts, else nothing (R1-4); refusals judged again when the copies land (R1-5); the manual flow's logo step and the orphan-files sentence corrected (R1-6); the charts toast pluralised (R1-7). Review round 2 (an independent review from the user's entry points, on a copy of `blockcopy-frozen-1`) and its correction (stage "correction 2", record §9): 4 findings, 1 MEDIUM, 2 LOW, 1 INFO; R2-1 MEDIUM, reproduced with the folded-in `C-r2-` scenarios in three engines on the corrected tree (INFL 5 of 5 each: a ⌘Z pressed while storage copied a file undid the step before and ⌘⇧Z could not bring it back, two quick ⌘D stacked their clones), corrected: ⌘D's clone and ⌘V's copies go in at once, one undo step, and take their own files silently once copied (R1-5's second judgement of the refusals is gone with the wait); R2-2 LOW corrected (a stored crop up to 100 % a side travels; its sibling, a custom table border of an older stored shape, too); R2-3 LOW did not hold on the corrected tree (R1-4's rule refuses 201 blocks, MEASURED in three engines); R2-4 INFO measured and recorded. Review round 3 (a re-check on a copy of `blockcopy-frozen-3`) and its correction (stage "correction 3", record §9): 5 findings, 1 MEDIUM, 3 LOW, 1 INFO, each reproduced with the folded-in `C-r3-` scenarios in Chromium, Firefox and WebKit before the change (KEEP 1/1, MSGT 2/2, HIST 6/6, PT 1/1 in each); R3-1 MEDIUM (a figure cut in one poster and pasted in another while storage failed on a temporary error was lost from both) corrected: a pasted image keeps showing its own-folder source while storage is busy, as ⌘D's clone does; R3-2 LOW (the "couldn't be copied" toast after a ⌘Z or a Replace) corrected: the toast counts the poster as it is when shown; R3-3 LOW (an undo of a step made while a copy was out put the copy back on its original's file, saved) corrected in the undo and redo steps, and in a move, resize or rotate drag's step (a sibling found and measured in the round); R3-4 LOW (a regression: a word double-clicked in References could not be copied) corrected: a double- or triple-click's words stay; R3-5 INFO: this row reworded, the too-large toast's wording queued; after: every claim 0 in the three engines (60 scenarios), 86 of 86 mutants killed, web suite, tsc and the production build pass. A final check of correction 3 (on `blockcopy-frozen-4`) and its correction (stage "correction 4", record §9): 3 findings, 1 MEDIUM, 1 LOW, 1 INFO; F35-FC-1 MEDIUM (a figure cut in one poster and pasted in another was lost from both when storage made the first copy but its answer was lost, a gateway's 504 or a network failure: the retry under the same name was refused as a duplicate) reproduced with the folded-in `C-r3-cut-cross-504-written` and its sibling `-answer-lost` in Chromium and Firefox before the change (KEEP 1/1, D 1/1 each) and in WebKit with the uncorrected lines served, and corrected: each copy try writes a new name; F35-FC-2 LOW (a refusal not about the file empties a pasted image showing the user's own file) and F35-FC-3 INFO (a busy or interrupted paste keeps a reference into the other poster's folder) re-measured with the checker's probe and queued above; after: every claim 0 in the three engines (62 scenarios), 87 of 87 mutants killed, web suite, tsc and the production build pass; queued above: "Queued by record 35". The lead's decision on F35-FC-2 and its build (stage "correction 5", record §9): for a pasted image or a ⌘D clone whose source is in the user's own folder, the block is emptied, with the "couldn't be copied" toast, only when storage's first answer says the file does not exist (statusCode 404 with storage's "not found"); every other refusal or failure (a 403, an expired token's `InvalidJWT`, a 409, storage busy, a 404 after a busy try) keeps it showing its source with no toast, sharing that file until a later Replace gives it its own name; another account's file or a source that is not a storage path is unchanged; ⌘D's clone follows the same rule (a clone of a missing file is now emptied, with the toast: a reading the lead may revise, record §9); reproduced first with the folded-in `C-fc-` scenarios (KEEP 4 of 5 and MISS 1 of 2 in Chromium and Firefox on the uncorrected tree, the same in WebKit with the old code served); after: every claim 0 in the three engines (69 scenarios), 96 of 96 mutants killed, web suite (4665 tests), tsc and the production build pass |
 | 36 (MVP design §3.4; items 6 and 22, OF-06, OF-11) | `fix/select-move` | implemented and reviewed (one round, a simple feature: the browser, through the user's entry points, on `selectmove-frozen-1`; 6 findings, 3 LOW, 3 INFO, record §9): corrected R36-1 (a drag that changes nothing, the group's or one block's, and, found here, an arrow pressed at the sheet's edge added an empty undo step, so the next ⌘Z showed nothing: the store's `setBlocks` now adds no step for a list that changes nothing, as `updateBlock`, `patchDoc` and `removeBlock` did; K4j and K3e observed in Chromium, Firefox and WebKit before, clean after), R36-3 (four sentences, and a fifth from main, about the grid, the Mac's fine key, line references and Esc in sidebar fields, made true) and R36-4 (the keys read one test of "a dialog is open" with Esc, undo and ⌘P; record 34's R34-7 sibling); R36-2 (Alt + ← and the other platform's key + ← are the browser's while a block is selected, as the rule says; main cancelled them) is an owner question above ("Queued by record 36"), its lost-edit half handed to fix 27's area there; R36-5 and R36-6 noted; fix 12's whole harness clean in the three engines after; the correction is in the frozen copy `selectmove-frozen-2` — `docs/fixes/36-select-move.md`; the design's key rule and gestures, reproduced first in Chromium, Firefox and WebKit on main with fix 12's harness extended (`undo-history-check.mjs --only SM`, `lib/selectMoveScenarios.mjs`): Backspace, Delete, → and ⌘D on a focused menu removed, moved or copied the selected block (OF-11; the guard was copied at three places, the table's range listener cleared a dragged range too), Esc never left text or deselected, ⌘A selected nothing, ⌘ / Ctrl / Alt + arrow moved ½ in and Shift + arrow 0.1 in, one ⌘Z after a group move or resize left every block where the drag put it (OF-06); after: the three guards one test (`canvasPaste.ts` `isEditing`), Esc (`selectionKeys.ts`, in the capture phase: a dialog or a marked menu takes it first) leaves text with the block selected and otherwise deselects, ⌘A selects every block but the credit mark, ⌘ + arrow on a Mac and Ctrl + arrow elsewhere 0.1 in (Ctrl + arrow PowerPoint's finer nudge on Windows, ⌘ on a Mac by the same rule; read in Microsoft's documentation first), every other modifier with an arrow nothing, the group drag one step undone exactly and redone; every claim 0 in the three engines (the instrument reads the store from `/src`, so not on the production build), each part red in the browser on its own; fix 12's whole harness clean in the three engines, fix 34's canvas-paste-check clean in Chromium (before the correction; after it see record §8b); 25 of 25 mutants killed before the correction (after it 28 of 28, and fix 34's paste check clean in the three engines), 2 blind spots (one guarded in the browser, one unreachable and accepted); queued above: "Queued by record 36" |
 | 38 (record 36 §10's handoff: a save on leaving) | `fix/save-on-leave` | implemented; review round 1 run and corrected (correction 1, 2026-10-17: R1-1 HIGH, the dashboard reached with a failing or slow save lost the change silently, in three engines and on main: the change is now kept by the page until stored and the poster opened again opens from it; R1-2 MEDIUM, a newer save landed before an older cut-off one with a slow next page, Firefox and WebKit: nothing newer for 10 s after a cut-off; R1-3 and R1-4 LOW fixed; the round's cells clean in three engines; 43 of 43 mutants killed, fix 27's 69 of 69; suite 4,626 of 4,626); review round 2 run and corrected (correction 2, 2026-10-17: R2-1 MEDIUM, WebKit's Back failed the save out just before `beforeunload` and the newer poster sent at once was stored under the older one: a failure 200 ms or less before the leave now counts as its cut, and a save that waited on the failed write waits those 200 ms (its sibling, found with main as the control: main stored the waiting save under the cut one in WebKit, 1 of 4 runs); R2-2, R2-3 and R2-4 LOW fixed: the poster opened again reads the kept change before its load, the leave's keepalive ask is spent when nothing is written, a deleted poster's kept change goes with it; the round's probes folded in, `lib/keepWorkLeaveRound2*.mjs`; 55 of 55 mutants killed, fix 27's 69 of 69; suite 4,635 of 4,635); review round 3 run and corrected (correction 3, 2026-10-17: R3-1 LOW, a save the server answered with an error was counted as the browser's cut, so a change was lost after the dialog at a close within 200 ms, or stored 10 s late after Stay, in three engines: only a failure with no answer counts now, the data layer keeping the answer's status on the error (also the failure diagnostic's, always 0 before); R3-2 LOW, the newer edit's own wait firing in the 200 ms after a cut was not held: older over newer on the WebKit build 1 of 21, and in three engines with the order made deterministic: held now; R3-3 references regenerated; the round's probes folded in, `lib/keepWorkLeaveRound3.mjs`; 60 of 60 mutants killed, fix 27's 69 of 69; suite 4,644 of 4,644); no round 4 by the stopping rule, the lead's call — `docs/fixes/38-save-on-leave.md`; reproduced first from the user's entry with fix 27's instrument, extended (`keep-work-check.mjs --only L`, `lib/keepWorkLeave.mjs`): an edit then a leave at once lost in 19–20 of 24 cells in Chromium, 20 in WebKit and 8–10 in Firefox (four silently, a reload), an older poster stored over a newer one in Firefox (a slow save, an edit, a new address), a failed save recovered then the tab closed lost in Chromium and WebKit, the dashboard then the tab closed lost in all three; cause: the save made at `beforeunload` waited on the client's asynchronous session read, and the page went first; changed: the leave's write sent at once with keepalive (beforeunload before the dialog, pagehide, the tab hidden, the unmount), one write at a time kept, no write right after one the leave cut off; 0 of 24 lost in the three engines, L4 clean, fix 27's scenarios clean; 25 of 25 mutants killed |
+
+| 20 | `fix/20-focus-ring` | implemented and reviewed (one round, a simple feature: the browser, through the user's entry points, on `focusring-frozen-1`; 6 findings, 2 MEDIUM, 3 LOW, 1 INFO, record §9) and corrected: R20-1 (the `<summary>` disclosures, the Edit tab's table tips, the sign-up page's email preferences and the pricing page's "What's included", kept the browser's ring after a click and a key, 20 of 23 in Chromium on main and the first build; `summary` added to the pointer-mode rule, 0 of 23 after; the sweeps now also run with a block of each kind selected) and R20-2 (the first build's rule M3 turned the ring on after Enter or Esc pressed after a click whenever a dialog moved the focus, 6 of 6 in Chromium on the template's and the dashboard's Delete dialogs; M3 removed, the plan's rule, 0 of 6 after, red first in jsdom), R20-4 and R20-5 (sentences made true), R20-3 and R20-6 recorded (Later list above); the correction is in the frozen copy `focusring-frozen-2` — `docs/fixes/20-focus-ring.md`; reproduced first from the user's entry in Chromium, Firefox and WebKit (`fit-check.mjs --only 'focus-*'`, new `lib/focusRingScenarios.mjs`: after a mouse click on a chrome button, every key but Tab and ⌘Z drew the ring in Chromium, 274 of 294 button cases on the zoom bar, the top bar's Save PDF, the ten sidebar tabs, the sidebar's buttons, every button outside the sheet and the public pages' menu button, and the browser's own ring on the sidebar's two links, an author's two checkboxes, a table's Show caption box and the table's tips, 6 of 8; Firefox 0, WebKit focuses no button on a click but draws its own ring on the summaries, 17 of 23; MEASURED on a worktree of `ac7d793`); built: `lib/inputModality.ts` keeps pointer or keyboard on `<html data-postr-input-modality>` (a press: pointer; Tab with any modifier: keyboard; no other key changes it; absent before any input), and `index.css` draws the house ring unless in pointer mode and turns the browser's own ring off there on buttons, links, checkboxes and `<summary>`; after: 0 in each engine, every keyboard ring kept with the same look (63 elements by Tab and Shift+Tab, 45 of 45 keys after Tab, the two dialogs from the keyboard, the three summaries, a script's focus before input), fix 12's B claims and record 36's SM claims clean in the three engines, 8 of 8 mutants killed and 10 browser blind spots guarded; the production build clean in Chromium |
+
+| 37 (record 33's sibling f, R1-F2) | `fix/load-size-cap` | implemented — `docs/fixes/37-load-size-cap.md`: the editor page's load-time repair (`pages/Editor.tsx` `normalizeStaleStyles`) replaced any text level above title 216, heading 100.8, authors or body 72 pt with today's default on every open, meant for posters stored before the typography calibration (979df80); the Style tab and A+ reach those sizes, so a user's own sizes were reset. Reproduced first from the user's entry in Chromium, Firefox and WebKit (`text-size-check.mjs`: a hand-set title 226.67 and heading 106.67 pt after A+, reopened 100.8 and 57.6; the Style tab's heading 110 pt, reopened 57.6; Body 12 pt then A+, 235.2 / 134.4 / 84 pt reopened 100.8 / 57.6 / 36; a title typed as 432 pt, reopened 100.8). Now an old poster is recognised by the old default's four sizes together (title 60, heading 28, authors 22, body 18 units, the posters table's first default, 853ec1c) and opens at today's defaults; every other size opens as stored; a missing level is still filled. After: the instrument clean in three engines (the old-default fixtures still repaired), 5 of 5 mutants killed; siblings measured (sheet size at the fields' bounds, palette and font kept; an emptied poster gets the template and Classic palette back, queued above); its one review round (a simple fix: the browser, through the user's entry points, the lead's, on `loadcap-frozen-1`) done: 7 findings (1 MEDIUM, 3 LOW, 3 INFO), none against the fix's code; corrected: the record's, the plan's and the checklists' sentences that took a new row for today's defaults (R37-2, R37-3 and its sibling in manual-test-flows §38, R37-4, R37-7) and §7's claim qualified (R37-5); the reviewer's probe folded into `text-size-check.mjs` as information (`new-row-defaults`, `new-row-emptied`, `old-default-strings`, `old-default-authors-absent`; after: exit 0 in three engines, 58 scenarios each); queued above: a new poster starts at the column default, title 158.4 pt (R37-1, MEDIUM, older than record 37, MEASURED in three engines; a cause of its own, for the lead) and a reload inside the autosave's window (R37-6, UNVERIFIED); the correction is in the frozen copy `loadcap-frozen-2` |
+| 39 (MVP design §3.2, text editing rules) | `fix/text-editing` | implemented, reviewed (a simple feature: one round on `textedit-frozen-1`), correction 1 made — `docs/fixes/39-text-editing.md`; reproduced first in Chromium, Firefox and WebKit (`keep-work-check.mjs --only TE`, new `lib/keepWorkTextEdit.mjs`): no x² or x₂ on the bar, Control + Shift + = and Control + = did nothing and were not cancelled, • never showed pressed (and B stayed unpressed after B in Firefox), "n/a" + Enter gave "nα", "w/" "wα", "μg/d" "μgδ", "see Fig. 2/" "see Fig. 2α" (the design doc's probe, now in the browser), the menu listed 8 of the 65 symbols with nothing highlighted, a symbol at a line's start joined the line to the one before ("ZQJ1α"); the engines' own superscript commands misread their state under the page's base style in Chromium and WebKit (MEASURED), so x² and x₂ read and change the markup (`poster/scriptFormat.ts`); the keys read in Microsoft's pages first: Ctrl + Shift + = and Ctrl + = on Windows, Control (⌘ allowed with it) on a Mac, not ⌘ + = as the design doc guessed; after: every claim 0 in the three engines and on the production build (Chromium), sub and sup kept through typing on, a reload, Save PDF, the PowerPoint file and a copy between blocks (they already were on main once pasted in), each main part red in the browser on its own (14 of 14), 24 of 24 mutants killed, 1 blind spot guarded in Firefox; fix 12's whole harness clean in the three engines, fix 27's in Chromium; queued above: "Queued by record 39". **Reviewed** (one round on `textedit-frozen-1`, record §9): 8 findings, all re-measured here before acting (the reviewer's probes folded into the instrument as TE3i, TE4-slash-br-line, TE2n, TE4b, TE4m, `TE-I-insert-variants`, `TE-I-layouts`); **correction 1**: a copy or cut of the sub- or superscript characters alone lost them in Chromium and WebKit, on main too (TE3i: a plain "2" stored), now written by the editor (`scriptClipboard.ts`); in Firefox a symbol at the start of a line made with Shift + Enter, or in a list item, still deleted the line break (TE4jb, TE4jl), now inserted in the DOM itself; Ctrl + the keypad's + was subscript (TE2n); the menu near the window's bottom ran off it (TE4b), now above the caret; Shift + ↓ with the menu open left it open and Tab inserted a symbol (TE4m); after: every claim 0 in the three engines and on the production build, 35 of 35 mutants killed, 2 blind spots guarded in Firefox; the German layout statement corrected and the "/" after a bracket an owner question, on the list above; frozen for the next review on `textedit-frozen-2` |

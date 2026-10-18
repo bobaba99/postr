@@ -22,6 +22,8 @@ import { useMemo, type CSSProperties, type JSX } from 'react';
 import { createPortal } from 'react-dom';
 import type { SelectionInfo } from './RichTextEditor';
 import { ADJUSTMENTS_ENABLED, SHARING_ENABLED } from '@/config/features';
+import { scriptTitle, toggleScript, type ScriptTag } from './scriptFormat';
+import { MAC } from './selectionKeys';
 
 /**
  * Compute the plain-text character offset of `node` + `offset` within
@@ -159,6 +161,34 @@ function cmdButton(
   );
 }
 
+/**
+ * x² and x₂ (record 39, rule T1): toggle superscript or subscript on the
+ * selection, from its markup (scriptFormat.ts), not the browsers' own
+ * commands, whose state the page's base style misreads.
+ */
+function scriptButton(label: string, tag: ScriptTag, active: boolean, onChange: (() => void) | undefined): JSX.Element {
+  return (
+    <button
+      key={tag}
+      type="button"
+      aria-pressed={active}
+      title={scriptTitle(tag, MAC)}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        if (toggleScript(tag)) onChange?.();
+      }}
+      style={{
+        ...btnBase,
+        fontWeight: 600,
+        background: active ? '#7c6aed33' : 'transparent',
+        color: active ? '#c8b6ff' : '#e2e2e8',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 function colorSwatch(
   color: string | null,
   command: 'foreColor' | 'hiliteColor',
@@ -221,7 +251,9 @@ function colorSwatch(
  *  with the other adjustments.
  *
  *  While ADJUSTMENTS_ENABLED is off (record 29, bounded-designs.md §3.2):
- *  B, I, U, bullets, numbered and Clear only. Strikethrough, indent,
+ *  B, I, U, x², x₂, bullets, numbered and Clear only (x² and x₂ from
+ *  record 39: superscript and subscript, PowerPoint's keys in their titles).
+ *  Each button shows its state for the selection. Strikethrough, indent,
  *  outdent, highlight and text colour are hidden; text already struck,
  *  indented or coloured still draws, and Clear removes it.
  *
@@ -242,6 +274,10 @@ export function FormatToolbarButtons({
     italic: false,
     underline: false,
     strikethrough: false,
+    superscript: false,
+    subscript: false,
+    bulletList: false,
+    numberedList: false,
   };
   return (
     <>
@@ -249,6 +285,8 @@ export function FormatToolbarButtons({
       {cmdButton('I', 'italic', formats.italic, onChange, { fontStyle: 'italic' })}
       {cmdButton('U', 'underline', formats.underline, onChange, { textDecoration: 'underline' })}
       {ADJUSTMENTS_ENABLED && cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}
+      {scriptButton('x²', 'sup', formats.superscript, onChange)}
+      {scriptButton('x₂', 'sub', formats.subscript, onChange)}
 
         <div style={divider} />
 
@@ -261,8 +299,8 @@ export function FormatToolbarButtons({
           friction path to "give text blocks bulleted lists with
           indent" for imported / freshly-typed content.
         */}
-        {cmdButton('•', 'insertUnorderedList', false, onChange, { fontSize: 14 })}
-        {cmdButton('1.', 'insertOrderedList', false, onChange, { fontSize: 11, fontWeight: 600 })}
+        {cmdButton('•', 'insertUnorderedList', formats.bulletList, onChange, { fontSize: 14 })}
+        {cmdButton('1.', 'insertOrderedList', formats.numberedList, onChange, { fontSize: 11, fontWeight: 600 })}
         {ADJUSTMENTS_ENABLED && (
           <>
             {cmdButton('⇥', 'indent', false, onChange, { fontSize: 14 })}

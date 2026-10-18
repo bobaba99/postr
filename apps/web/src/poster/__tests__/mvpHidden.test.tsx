@@ -135,7 +135,10 @@ describe('the adjustments are hidden (ADJUSTMENTS_ENABLED, D4)', () => {
     await tab(/^layout$/);
     expect(sideLabels(/Show grid/)).toEqual([]);
     expect(document.querySelector('[data-postr-overlay="grid"]')).toBeNull();
-    expect(sideText()).not.toMatch(/visual aid/i);
+    // The overlays section keeps the rulers' toggle (fix 04 showed them
+    // again), so its line names one aid, not two.
+    expect(sideText()).not.toMatch(/Visual aids only/);
+    expect(sideText()).toMatch(/A visual aid only — it never prints or exports\./);
   });
 
   it('the style tab keeps palette, font and the four sizes, and nothing else', async () => {
@@ -167,10 +170,11 @@ describe('the adjustments are hidden (ADJUSTMENTS_ENABLED, D4)', () => {
     expect(sideText()).toMatch(/Body text · 130 pt/);
   });
 
-  it('the format bar keeps B, I, U, bullets, numbered and Clear, and nothing else', () => {
+  it('the format bar keeps B, I, U, bullets, numbered and Clear, adds x² and x₂ (record 39), and nothing else', () => {
     render(<FormatToolbarButtons />);
     const titles = Array.from(document.querySelectorAll('button')).map((b) => b.getAttribute('title'));
-    expect(titles).toEqual(['B', 'I', 'U', '•', '1.', 'Clear formatting']);
+    // jsdom is not a Mac: the keys in the titles are Ctrl's.
+    expect(titles).toEqual(['B', 'I', 'U', 'Superscript (Ctrl+Shift+=)', 'Subscript (Ctrl+=)', '•', '1.', 'Clear formatting']);
   });
 
   it('an image selected: no crop, rotate, stretch, caption position, spacing or Format; Show caption instead', async () => {

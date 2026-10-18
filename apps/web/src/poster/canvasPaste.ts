@@ -9,7 +9,7 @@
  *
  * | Order | The clipboard holds | Then |
  * |---|---|---|
- * | 1 | Postr's own copied blocks | not built: the next fix (block copy and paste) adds its check first in `readCanvasPaste` |
+ * | 1 | Postr's own copied blocks (the marked payload, blockClipboard.ts) | copies of them (record 35: blockClipboard.ts's rules, useBlockClipboard.ts pastes them); a marked payload that fails validation pastes nothing |
  * | 2 | HTML with a `<table>` (Excel, Word, Sheets) | a new table block, filled by record 32's grid reader (tablePaste.ts) |
  * | 3 | an image file, and no text | a new image block; if an EMPTY image block is selected, that one is filled instead |
  * | 4 | any other text, tabs included | a new text block holding it, cleaned as record 32's text paste (pasteClean.ts) |
@@ -41,19 +41,20 @@
  * Its size is Insert's for its type; an image block's is Insert › Image's
  * box with the image's shape (imageFile.ts).
  *
- * Out of scope (record 34 §10): Postr's own block copy, cut and paste and
- * its clipboard payload (order 1, the next fix), the image file a ⌘D clone
- * shares (§3.3 D, the next fix), images in a table cell, dragging text or
- * blocks between posters, SVG markup pasted as text.
+ * Out of scope (record 34 §10): images in a table cell, dragging text or
+ * blocks between posters, SVG markup pasted as text. Order 1 and the image
+ * files of §3.3 D are record 35's (docs/fixes/35-block-copy.md).
  */
 import type { Block, TableData } from '@postr/shared';
 import { SNAP_GRID } from './constants';
 import { pastedHtml } from './pasteClean';
 import { sanitizeTyped } from './sanitizeHtml';
 import { htmlTableGrid, pasteGrid } from './tablePaste';
+import { readClip, type ClipPayload } from './blockClipboard';
 
 /** What a paste with nothing in edit mode makes (table B); null for order 5. */
 export type CanvasPaste =
+  | { kind: 'blocks'; payload: ClipPayload | null }
   | { kind: 'table'; rows: string[][] }
   | { kind: 'image'; file: File }
   | { kind: 'text'; html: string };
@@ -99,8 +100,10 @@ export function pastedWords(html: string, text: string): string {
 export function readCanvasPaste(data: TransferLike): CanvasPaste | null {
   const html = data.getData('text/html') ?? '';
   const text = data.getData('text/plain') ?? '';
-  // Order 1, Postr's own copied blocks, is the next fix's (block copy and
-  // paste): its check goes here, before order 2.
+  // Order 1, Postr's own copied blocks (record 35): a marked payload is
+  // order 1's whatever it holds; one that fails validation pastes nothing.
+  const clip = readClip(html);
+  if (clip) return { kind: 'blocks', payload: clip.payload };
   const rows = html ? htmlTableGrid(html, text) : null;
   if (rows) return { kind: 'table', rows };
   const words = pastedWords(html, text);

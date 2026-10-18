@@ -33,7 +33,10 @@
  *     folder); `createSignedUrl` answers a token that names the path and
  *     a counter, so every signing is a new URL, and the signed URL serves
  *     the path's bytes as they are now, with Supabase's default
- *     `cache-control: max-age=3600`.
+ *     `cache-control: max-age=3600`; since record 35 storage-js's copy
+ *     (`POST /object/copy`: the source readable and the destination
+ *     writable under the session's own folder, a destination that exists
+ *     refused), logged in `state.copies`.
  *
  * Nothing in the app is stubbed; only the network is faked. Use it with
  * editorHarness.mjs's startHarness (the app's own Vite server + a browser).
@@ -80,6 +83,7 @@ export function newState({ anonymous = true, expiresIn = 3600, plan = 'free' } =
     // otherwise (an engine's clipboard file is "image.png").
     handedLast: null,
     signs: [], // every createSignedUrl: {t, path, sub, status}
+    copies: [], // every storage copy in poster-assets (record 35): {t, from, to, sub, bucket, status}
     signups: [],
     aborted: [], errors: [], console: [],
   };
@@ -266,6 +270,37 @@ export async function installGuestBackend(context, state, base, { tour = false }
       state.objects.set(path, { bytes: file.bytes, type: file.type, t: Date.now() });
       state.uploads.push({ ...entry, status: 200 });
       return json(route, { Key: `poster-assets/${path}`, Id: randomUUID() });
+    }
+    // storage-js's copy (record 35, a pasted or cloned image's own file):
+    // POST /object/copy {bucketId, sourceKey, destinationKey}. Row-level
+    // security as for an upload and a signing: the session must be able to
+    // read the source (its own folder) and write the destination (its own
+    // folder); a destination that exists is refused as the storage API
+    // refuses it; the source's bytes are copied as they are now.
+    if (method === 'POST' && p === '/storage/v1/object/copy') {
+      let b = {};
+      try { b = JSON.parse(req.postData() || '{}'); } catch { /* keep {} */ }
+      const entry = { t: Date.now(), from: b.sourceKey ?? null, to: b.destinationKey ?? null, sub, bucket: b.bucketId ?? null };
+      if (b.bucketId !== 'poster-assets' || typeof b.sourceKey !== 'string' || typeof b.destinationKey !== 'string') {
+        state.copies.push({ ...entry, status: 400 });
+        return json(route, { statusCode: '400', error: 'Bad Request', message: 'invalid copy' }, 400);
+      }
+      if (!ownFolder(b.sourceKey) || !state.objects.has(b.sourceKey)) {
+        state.copies.push({ ...entry, status: 400 });
+        return json(route, { statusCode: '404', error: 'not_found', message: 'Object not found' }, 400);
+      }
+      if (!ownFolder(b.destinationKey)) {
+        state.copies.push({ ...entry, status: 403 });
+        return json(route, { statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' }, 403);
+      }
+      if (state.objects.has(b.destinationKey)) {
+        state.copies.push({ ...entry, status: 409 });
+        return json(route, { statusCode: '409', error: 'Duplicate', message: 'The resource already exists' }, 409);
+      }
+      const src = state.objects.get(b.sourceKey);
+      state.objects.set(b.destinationKey, { bytes: Buffer.from(src.bytes), type: src.type, t: Date.now() });
+      state.copies.push({ ...entry, status: 200 });
+      return json(route, { Key: `poster-assets/${b.destinationKey}` });
     }
     if (method === 'POST' && p.startsWith(SIGN)) {
       const path = p.slice(SIGN.length);

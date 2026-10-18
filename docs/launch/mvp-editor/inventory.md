@@ -57,7 +57,7 @@ The poster has 9 block kinds: `title`, `authors`, `heading`, `text`, `image`, `l
 |---|---|---|---|---|---|---|
 | 2.1 | Insert tab: 7 buttons (Heading, Text, Image, Chart, Table, References, Logo) | `addBlock` places the block in an open slot at its default size. A poster has **one logo at most**: pressing Logo again selects the existing one. Chart opens Figure › Make instead of adding a block | `poster/Sidebar.tsx:4156-4236` (list `:4164-4172`); `poster/PosterEditor.tsx:1878-1911` (logo rule `:1885-1891`) | Tab (Insert) | 1 of 7 | CORE |
 | 2.2 | Title, heading and text, typed on the canvas | Editable in place. Placeholders read "Poster Title", "Section Heading" and "Type here… (type / for symbols)" | `poster/blocks.tsx:2214, 2256, 2279`; `poster/RichTextEditor.tsx` | Shown | typing | CORE |
-| 2.3 | Slash symbols | `/` opens a menu of 66 entries: Greek letters, math signs, arrows and stats shortcuts | `poster/symbols.ts:11-34`; `poster/RichTextEditor.tsx` | Deep (keyboard) | optional | ADJUST (cheap) |
+| 2.3 | Slash symbols | `/` opens a menu of 65 entries (66 here before record 39 counted the keys): Greek letters, math signs, arrows and stats shortcuts | `poster/symbols.ts:11-34`; `poster/RichTextEditor.tsx` | Deep (keyboard) | optional | ADJUST (cheap) |
 | 2.4 | Pasting into text | The paste is sanitized. **Kept:** bold, italic, underline, strike, sub, sup, lists, color, highlight. **Dropped:** font size and font family, so pasted text takes the poster's type style. This is the master narrative's "format reset on paste" pain, already handled | `poster/RichTextEditor.tsx:239-256`; `poster/sanitizeHtml.ts:53-84`. MEASURED: a Word span with `font-family: Calibri; font-size: 11pt` comes out as plain `pasted` | — | 0 | AUTO, CORE |
 | 2.5 | Edit tab "Content" box for a text block | A second editor for the same text, with a docked format toolbar | `poster/Sidebar.tsx:3951-3993` | Deep (Edit tab, needs a selected text block) | — | duplicate surface |
 | 2.6 | Image upload | Click "+ Upload figure" to open the file picker. Images up to 10 MB. "Replace image" sits on the block's handle row. **There is no drag-and-drop and no clipboard paste of images**: a search for `onDrop`, `dataTransfer` and image `clipboardData` in `poster/*.tsx` found none | `poster/blocks.tsx:97, 118, 408, 450-457, 2530` | Shown (placeholder) | Pick a file | CORE |
@@ -90,7 +90,7 @@ The poster has 9 block kinds: `title`, `authors`, `heading`, `text`, `image`, `l
 | 3.11 | Delete a block | Delete or Backspace; the red button on the handle row; the right-click "Delete". The credit mark refuses | `poster/PosterEditor.tsx:2217-2226`; `poster/blocks.tsx:2591, 2728` | Shown | — | CORE |
 | 3.12 | Align and distribute | **None.** A search for align or distribute and group or ungroup found no block-level controls | — | — | — | GAP (PowerPoint: Arrange › Align [PPT knowledge]) |
 | 3.13 | Show grid | A checkbox. The grid is a visual aid and never prints | `poster/Sidebar.tsx:1087-1096`; `poster/PosterEditor.tsx:748, 2873-3000` | Deep (bottom of the Layout tab) | 1 | ADJUST |
-| 3.14 | Rulers | Turned off (`RULERS_ENABLED = false`). Neither the toggle nor the rulers render | `config/features.ts:67`; `poster/Sidebar.tsx:1098-1107`; `poster/PosterEditor.tsx:747, 3288` | Flag | — | HIDDEN |
+| 3.14 | Rulers | Turned off (`RULERS_ENABLED = false`). Neither the toggle nor the rulers render. *Since 2026-10-16 (fix 04, after this inventory): shown again, `RULERS_ENABLED = true`; record `docs/fixes/04-rulers-match-sheet.md`* | `config/features.ts:67`; `poster/Sidebar.tsx:1098-1107`; `poster/PosterEditor.tsx:747, 3288` | Flag | — | HIDDEN |
 | 3.15 | Zoom | Buttons: −, a % readout (fits on click), +, FIT. Pinch and Ctrl+wheel also zoom | `poster/PosterEditor.tsx:615, 3560-3650` | Shown | 4 | CORE (navigation) |
 | 3.16 | Show / hide the sidebar | ⌘/; a "Hide sidebar" button; a "Show sidebar" tab | `poster/PosterEditor.tsx:988-991, 2733-2734`; `poster/Sidebar.tsx:466-467` | Shown | — | navigation |
 | 3.17 | Layout (Auto-Arrange, templates) | See 1.8 and 1.9 | | | | BULK |
@@ -154,7 +154,7 @@ Font size and color can each be set in several places:
 | Control | Switch | Where |
 |---|---|---|
 | Comments tab, "Comment on selection", area comments, share link | `SHARING_ENABLED = false` | `config/features.ts:53`; `poster/Sidebar.tsx:644, 820`; `poster/FloatingFormatToolbar.tsx:377` |
-| Rulers and their toggle | `RULERS_ENABLED = false` | 3.14 |
+| Rulers and their toggle | `RULERS_ENABLED = false` (shown again since 2026-10-16, fix 04) | 3.14 |
 | LaTeX export | `LATEX_EXPORT_ENABLED = false` | 7.3 |
 | Publish to gallery | `GALLERY_PUBLIC_ENABLED = false` | 7.6 |
 | Review tab (Presentation Checker) | commented out | `poster/Sidebar.tsx:7-12, 642, 811-816` |

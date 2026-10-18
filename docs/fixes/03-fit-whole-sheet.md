@@ -815,7 +815,12 @@ control) and 4 as weaker (3 one tree, 1 code only), all 4 below confidence
 **Blind spots, falsified in the browser** (`blind-spot-check.mjs`,
 MEASURED): `ruler-origin-96`, `tour-no-scroll` and
 `tour-scroll-into-view-everything` are guarded (their scenarios go red with
-the mutant served). Accepted unguarded, with reasons in the specs: the
+the mutant served). (`ruler-origin-96` was retired on 2026-09-30 by fix 04:
+the ruler formula it mutated was removed when the rulers moved to
+`WorkspaceRulers.tsx` and began reading where the sheet is laid out, and fix
+04's own spec guards them; left in place, it made the whole fit spec stop as
+a bad spec, found by fix 04's step 9 review, CR9-04-02, and reproduced by its
+skeptic.) Accepted unguarded, with reasons in the specs: the
 whole-pixel floor (reached: fractional canvases in 664 of 720 of R2's
 sweep steps; yet without the floor, a visible defect (overflow, a scrollbar,
 a hidden sheet) in 0 of 720, MEASURED by R2) and the guarded media read (no environment here lacks a window
@@ -918,7 +923,10 @@ the remaining items re-ranked by their effect on a first visitor
 - **A ring after a mouse click.** Once D draws the house ring, a mouse user
   who clicked a chrome button (Zoom in, FIT, a rail tab) and then presses an
   arrow key or Shift sees a ring on that button: Chromium's `:focus-visible`
-  rule (6 of 7 cases; 0 on main, where no ring drew at all).
+  rule (6 of 7 cases; 0 on main, where no ring drew at all). Kept by the
+  owner as plan item 20 and fixed there: `docs/fixes/20-focus-ring.md`
+  (re-measured on main: every key but Tab and ⌘Z, 274 of 294 button cases
+  in Chromium, record 20 §4).
 - **A 0 px canvas.** At 800 × 600 with both panels open the canvas has no
   width; the readout shows 0–1% (a fit left from the panel's slide) where
   main showed 100%. Nothing is visible either way.

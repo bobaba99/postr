@@ -1,0 +1,293 @@
+{
+  "tests": [
+    "src/lib/__tests__/inputModality.test.ts"
+  ],
+  "mutants": {
+    "press-not-pointer": {
+      "undoes": "Hm — a pointer press puts the page in pointer mode",
+      "edits": [
+        [
+          "src/lib/inputModality.ts",
+          "  const onPointerDown = () => set('pointer');\n",
+          "  const onPointerDown = () => {};\n"
+        ]
+      ]
+    },
+    "tab-not-keyboard": {
+      "undoes": "Hk — Tab or Shift+Tab, with any modifier, is keyboard navigation (even when nothing takes the focus)",
+      "edits": [
+        [
+          "src/lib/inputModality.ts",
+          "    if (e.key === 'Tab') set('keyboard');\n",
+          ""
+        ]
+      ]
+    },
+    "tab-without-modifiers-only": {
+      "undoes": "Hk — Option+Tab (Safari's way to buttons) is keyboard navigation too",
+      "edits": [
+        [
+          "src/lib/inputModality.ts",
+          "if (e.key === 'Tab') set('keyboard');",
+          "if (e.key === 'Tab' && !e.altKey) set('keyboard');"
+        ]
+      ]
+    },
+    "every-key-keyboard": {
+      "undoes": "Hm — a key that leaves the focus where it is does not switch the ring on (Chromium's own :focus-visible rule)",
+      "edits": [
+        [
+          "src/lib/inputModality.ts",
+          "    if (e.key === 'Tab') set('keyboard');\n",
+          "    set('keyboard');\n"
+        ]
+      ]
+    },
+    "focus-move-after-key-keyboard": {
+      "undoes": "Hm-move — a key pressed after a click that the page follows with a focus move (Esc giving the focus back to a dialog's opener, Enter opening one, the window getting it back) does not switch the ring on: the first build's rule M3, put back (review round 1, R20-2)",
+      "edits": [
+        [
+          "src/lib/inputModality.ts",
+          "  const onPointerDown = () => set('pointer');\n",
+          "  let lastKey = false;\n  const onPointerDown = () => {\n    lastKey = false;\n    set('pointer');\n  };\n  const onFocusIn = () => {\n    if (lastKey) set('keyboard');\n  };\n"
+        ],
+        [
+          "src/lib/inputModality.ts",
+          "    if (e.key === 'Tab') set('keyboard');\n",
+          "    lastKey = true;\n    if (e.key === 'Tab') set('keyboard');\n"
+        ],
+        [
+          "src/lib/inputModality.ts",
+          "  win.addEventListener('keydown', onKeyDown, true);\n",
+          "  win.addEventListener('keydown', onKeyDown, true);\n  win.addEventListener('focusin', onFocusIn, true);\n"
+        ],
+        [
+          "src/lib/inputModality.ts",
+          "    win.removeEventListener('keydown', onKeyDown, true);\n",
+          "    win.removeEventListener('keydown', onKeyDown, true);\n    win.removeEventListener('focusin', onFocusIn, true);\n"
+        ]
+      ]
+    },
+    "every-focus-move-keyboard": {
+      "undoes": "Hm — a focus move after a pointer press (a click that opens a dialog) stays pointer",
+      "edits": [
+        [
+          "src/lib/inputModality.ts",
+          "  win.addEventListener('keydown', onKeyDown, true);\n",
+          "  const onFocusIn = () => set('keyboard');\n  win.addEventListener('keydown', onKeyDown, true);\n  win.addEventListener('focusin', onFocusIn, true);\n"
+        ],
+        [
+          "src/lib/inputModality.ts",
+          "    win.removeEventListener('keydown', onKeyDown, true);\n",
+          "    win.removeEventListener('keydown', onKeyDown, true);\n    win.removeEventListener('focusin', onFocusIn, true);\n"
+        ]
+      ]
+    },
+    "press-in-bubble-phase": {
+      "undoes": "Hm — the press is seen in the window's capture phase, before a block control stops its propagation",
+      "edits": [
+        [
+          "src/lib/inputModality.ts",
+          "win.addEventListener('pointerdown', onPointerDown, true);",
+          "win.addEventListener('pointerdown', onPointerDown);"
+        ]
+      ]
+    },
+    "key-in-bubble-phase": {
+      "undoes": "Hk — Tab is seen in the window's capture phase, before an open dialog stops every key there (ConfirmModal)",
+      "edits": [
+        [
+          "src/lib/inputModality.ts",
+          "win.addEventListener('keydown', onKeyDown, true);",
+          "win.addEventListener('keydown', onKeyDown);"
+        ]
+      ]
+    },
+    "not-installed": {
+      "undoes": "Hm — the tracker runs in the app (main.tsx installs it before anything renders)",
+      "expect": "survive",
+      "why": "the unit tests install the tracker themselves; fit-check.mjs focus-mouse-zoombar reads the ring in Chromium, the one engine that draws it after a click and a key",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-mouse-zoombar"
+        ]
+      },
+      "edits": [
+        [
+          "src/main.tsx",
+          "installInputModality();\n",
+          ""
+        ]
+      ]
+    },
+    "ring-not-gated": {
+      "undoes": "Hm — the house ring (outline and radius) is not drawn in pointer mode, nor the browser's own: both CSS rules taken away",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs focus-mouse-zoombar reads it in Chromium",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-mouse-zoombar"
+        ]
+      },
+      "edits": [
+        [
+          "src/index.css",
+          ":where(html:not([data-postr-input-modality=\"pointer\"])) button:focus-visible,\n:where(html:not([data-postr-input-modality=\"pointer\"])) [role=\"button\"]:focus-visible {\n  outline: 2px solid #7c6aed !important;",
+          "button:focus-visible,\n[role=\"button\"]:focus-visible {\n  outline: 2px solid #7c6aed !important;"
+        ],
+        [
+          "src/index.css",
+          ":where(html[data-postr-input-modality=\"pointer\"]) button:focus-visible,\n:where(html[data-postr-input-modality=\"pointer\"]) [role=\"button\"]:focus-visible,\n:where(html[data-postr-input-modality=\"pointer\"]) a[href]:focus-visible,\n:where(html[data-postr-input-modality=\"pointer\"]) input[type=\"checkbox\"]:focus-visible,\n:where(html[data-postr-input-modality=\"pointer\"]) summary:focus-visible {\n  outline: none !important;\n}\n",
+          ""
+        ]
+      ]
+    },
+    "no-pointer-suppression": {
+      "undoes": "Hm — in pointer mode the browser's own ring is off on buttons too (the house rule's gate alone leaves Chromium's `auto` ring on a button styled without `all: unset`)",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs focus-mouse-sweep presses every button outside the sheet in Chromium",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-mouse-sweep"
+        ]
+      },
+      "edits": [
+        [
+          "src/index.css",
+          ":where(html[data-postr-input-modality=\"pointer\"]) button:focus-visible,\n:where(html[data-postr-input-modality=\"pointer\"]) [role=\"button\"]:focus-visible,\n:where(html[data-postr-input-modality=\"pointer\"]) a[href]:focus-visible,\n:where(html[data-postr-input-modality=\"pointer\"]) input[type=\"checkbox\"]:focus-visible,\n:where(html[data-postr-input-modality=\"pointer\"]) summary:focus-visible {\n  outline: none !important;\n}\n",
+          ""
+        ]
+      ]
+    },
+    "house-ring-not-gated": {
+      "undoes": "Hm — the house rule itself is gated (its 4 px radius, not only its outline, is off in pointer mode)",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; with the suppression rule in place the outline stays off, so only the house rule's 4 px radius differs, on a button whose own corners are neither inline nor 4 px: none in the editor (every button there sets its radius inline), so fit-check.mjs focus-mouse-public-menu reads the public pages' menu button (6 px) in Chromium",
+      "edits": [
+        [
+          "src/index.css",
+          ":where(html:not([data-postr-input-modality=\"pointer\"])) button:focus-visible,\n:where(html:not([data-postr-input-modality=\"pointer\"])) [role=\"button\"]:focus-visible {\n  outline: 2px solid #7c6aed !important;",
+          "button:focus-visible,\n[role=\"button\"]:focus-visible {\n  outline: 2px solid #7c6aed !important;"
+        ]
+      ],
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-mouse-public-menu"
+        ]
+      }
+    },
+    "keyboard-ring-suppressed": {
+      "undoes": "Hk — the suppression applies in pointer mode only: keyboard navigation keeps the house ring",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs focus-tab-sweep reads every button the keyboard reaches",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-tab-sweep"
+        ]
+      },
+      "edits": [
+        [
+          "src/index.css",
+          ":where(html[data-postr-input-modality=\"pointer\"]) button:focus-visible,\n:where(html[data-postr-input-modality=\"pointer\"]) [role=\"button\"]:focus-visible,",
+          ":where(html) button:focus-visible,\n:where(html) [role=\"button\"]:focus-visible,"
+        ]
+      ]
+    },
+    "no-ring-before-input": {
+      "undoes": "Hk — before any input the ring follows the browser's :focus-visible, as before the fix (the gate reads 'not pointer', not 'keyboard')",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs focus-script-before-input focuses the zoom bar's buttons by script with no input before, in Chromium",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-script-before-input"
+        ]
+      },
+      "edits": [
+        [
+          "src/index.css",
+          ":where(html:not([data-postr-input-modality=\"pointer\"])) button:focus-visible,\n:where(html:not([data-postr-input-modality=\"pointer\"])) [role=\"button\"]:focus-visible {",
+          ":where(html[data-postr-input-modality=\"keyboard\"]) button:focus-visible,\n:where(html[data-postr-input-modality=\"keyboard\"]) [role=\"button\"]:focus-visible {"
+        ]
+      ]
+    },
+    "links-not-suppressed": {
+      "undoes": "Hm (siblings) — in pointer mode the browser's own ring is off on links (the sidebar's Postr and Back to My Posters)",
+      "expect": "survive",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-mouse-siblings"
+        ]
+      },
+      "why": "jsdom draws no focus ring; fit-check.mjs focus-mouse-siblings presses every focusable element outside the sheet that is not a button or a text field, in Chromium",
+      "edits": [
+        [
+          "src/index.css",
+          ",\n:where(html[data-postr-input-modality=\"pointer\"]) a[href]:focus-visible",
+          ""
+        ]
+      ]
+    },
+    "checkboxes-not-suppressed": {
+      "undoes": "Hm (siblings) — in pointer mode the browser's own ring is off on checkboxes (an author's Corresponding and Equal contrib.)",
+      "expect": "survive",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-mouse-siblings"
+        ]
+      },
+      "why": "jsdom draws no focus ring; fit-check.mjs focus-mouse-siblings presses every focusable element outside the sheet that is not a button or a text field, in Chromium",
+      "edits": [
+        [
+          "src/index.css",
+          ",\n:where(html[data-postr-input-modality=\"pointer\"]) input[type=\"checkbox\"]:focus-visible",
+          ""
+        ]
+      ]
+    },
+    "summary-not-suppressed": {
+      "undoes": "Hm (siblings, review round 1, R20-1) — in pointer mode the browser's own ring is off on <summary> disclosures (the table's tips, the sign-up page's email preferences, the pricing page's \"What's included\")",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs focus-mouse-summary clicks each summary and presses each non-Tab key, in Chromium",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-mouse-summary"
+        ]
+      },
+      "edits": [
+        [
+          "src/index.css",
+          ",\n:where(html[data-postr-input-modality=\"pointer\"]) summary:focus-visible",
+          ""
+        ]
+      ]
+    },
+    "keyboard-other-targets-suppressed": {
+      "undoes": "Hk — links, checkboxes and <summary> disclosures keep the browser's own ring for keyboard navigation (their suppression is in pointer mode only)",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs focus-tab-sweep reads every button, link and checkbox the keyboard reaches, and focus-tab-summary each summary reached by Shift+Tab",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-tab-sweep",
+          "focus-tab-summary"
+        ]
+      },
+      "edits": [
+        [
+          "src/index.css",
+          ":where(html[data-postr-input-modality=\"pointer\"]) a[href]:focus-visible,\n:where(html[data-postr-input-modality=\"pointer\"]) input[type=\"checkbox\"]:focus-visible,\n:where(html[data-postr-input-modality=\"pointer\"]) summary:focus-visible {",
+          ":where(html) a[href]:focus-visible,\n:where(html) input[type=\"checkbox\"]:focus-visible,\n:where(html) summary:focus-visible {"
+        ]
+      ]
+    }
+  }
+}

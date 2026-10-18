@@ -49,8 +49,12 @@ import { dialogOpen, onHistoryButtons, runHistory, type HistoryDirection, type H
 import { useEditorHistory } from './useEditorHistory';
 import { usePrintShortcut } from './usePrintShortcut';
 import { useCanvasPaste } from './useCanvasPaste';
+import { emptyOnPoster, settleCopiedFiles, useBlockClipboard } from './useBlockClipboard';
+import { imagesLostMessage } from './blockClipboard';
+import { atPreDragGeometry } from './dragStep';
 import { insertSize, isEditing } from './canvasPaste';
 import { MAC, selectionKeyAction, useSelectionEscape } from './selectionKeys';
+import { copyPosterImage, heldAfterCopy, isStoragePath } from '@/data/posterImages';
 import { checkBounds, checkCollisions, type OobWarning } from './boundsCheck';
 import { GuidelinesPanel } from './GuidelinesPanel';
 import { OnboardingTour } from '@/components/OnboardingTour';
@@ -96,6 +100,7 @@ import {
   PHONE_GUTTER, WORKSPACE_GUTTER, ZOOM_STEP, clampZoom, fitSheet, type SheetFit,
 } from './workspaceGeometry';
 import { snap } from './snap';
+import { WorkspaceRulers } from './WorkspaceRulers';
 import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
 import { buildPrintDocument } from '@/export/printDocument';
 import { stripEditorChrome } from '@/export/stripEditorChrome';
@@ -522,8 +527,11 @@ function useBlockDrag(
         // Cmd+Z restores where the block was before the drag.
         if (s?.active && preDragBlocksRef.current) {
           // Temporarily restore pre-drag blocks so withUndo snapshots
-          // them, then apply the current (post-drag) blocks.
-          setBlocksSilent(preDragBlocksRef.current);
+          // them, then apply the current (post-drag) blocks. The snapshot
+          // is the blocks as they are now at their pre-drag geometry
+          // (`atPreDragGeometry`), so a change made silently during the
+          // drag is not undone with it (record 35, R3-3).
+          setBlocksSilent(atPreDragGeometry(blocksRef.current, preDragBlocksRef.current));
           setBlocks(blocksRef.current);
         }
         preDragBlocksRef.current = null;
@@ -747,8 +755,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     [showToast],
   );
 
-  // Scroll position for ruler rendering — updated on scroll events.
-  const [scrollPos, setScrollPos] = useState({ x: 0, y: 0 });
+  // The canvas's scroll position, kept for the re-render it causes: that
+  // keeps the text editor's focus hint (a fixed-position note placed during
+  // render) on its block (fix 04, measured: 60 px adrift without it). The
+  // rulers read the scroll themselves, before the frame is painted.
+  const [, setScrollPos] = useState({ x: 0, y: 0 });
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
@@ -1468,15 +1479,23 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // the start of a group drag so deltas can be computed from the origin.
   const groupDragOrigin = useRef<Block[] | null>(null);
 
+  // A group drag sets only the selected blocks' place and size, from where
+  // each was when the drag started, on the poster as it is NOW: a change made
+  // during the drag (an upload landing, a pasted copy getting its own file,
+  // records 34 and 35) is kept instead of being rewritten from the drag's
+  // start (the merge of records 35 and 36).
+  const currentBlocks = () => usePosterStore.getState().doc?.blocks ?? doc.blocks;
+
   const handleGroupMove = (dx: number, dy: number) => {
     if (!groupDragOrigin.current) groupDragOrigin.current = doc.blocks;
-    const origin = groupDragOrigin.current;
-    const next = origin.map((blk) => {
-      if (!selectedIds.has(blk.id)) return blk;
+    const start = new Map(groupDragOrigin.current.map((b) => [b.id, b]));
+    const next = currentBlocks().map((blk) => {
+      const o = start.get(blk.id);
+      if (!selectedIds.has(blk.id) || !o) return blk;
       return {
         ...blk,
-        x: snap(Math.max(0, blk.x + dx)),
-        y: snap(Math.max(0, blk.y + dy)),
+        x: snap(Math.max(0, o.x + dx)),
+        y: snap(Math.max(0, o.y + dy)),
       };
     });
     storeSetBlocksSilent(next);
@@ -1499,14 +1518,17 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     if (handle.includes('n')) { ngh = Math.max(20, gb.h - dy); ngy = gb.y + (gb.h - ngh); }
     else if (handle.includes('s')) { ngh = Math.max(20, gb.h + dy); }
 
-    // Proportionally remap each selected block. Guard against
+    // Proportionally remap each selected block from where it started, on
+    // the poster as it is now (see handleGroupMove). Guard against
     // zero-span axes (all blocks collinear) to avoid NaN.
-    const next = origin.map((blk) => {
-      if (!selectedIds.has(blk.id)) return blk;
-      const sx = gb.w > 0 ? (blk.x - gb.x) / gb.w : 0;
-      const sy = gb.h > 0 ? (blk.y - gb.y) / gb.h : 0;
-      const sw = gb.w > 0 ? blk.w / gb.w : 1;
-      const sh = gb.h > 0 ? blk.h / gb.h : 1;
+    const start = new Map(origin.map((b) => [b.id, b]));
+    const next = currentBlocks().map((blk) => {
+      const o = start.get(blk.id);
+      if (!selectedIds.has(blk.id) || !o) return blk;
+      const sx = gb.w > 0 ? (o.x - gb.x) / gb.w : 0;
+      const sy = gb.h > 0 ? (o.y - gb.y) / gb.h : 0;
+      const sw = gb.w > 0 ? o.w / gb.w : 1;
+      const sh = gb.h > 0 ? o.h / gb.h : 1;
       return {
         ...blk,
         x: snap(ngx + sx * ngw),
@@ -1531,7 +1553,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     const origin = groupDragOrigin.current;
     groupDragOrigin.current = null;
     const dragged = usePosterStore.getState().doc?.blocks ?? outerBlocksRef.current;
-    if (origin) storeSetBlocksSilent(origin);
+    // The step's snapshot is the blocks as they are now at their pre-drag
+    // place and size, as a single block's drag (record 35, R3-3's sibling):
+    // a change made silently during the drag — a pasted copy getting its
+    // own file — is not undone with the drag (the merge of records 35 and 36).
+    if (origin) storeSetBlocksSilent(atPreDragGeometry(dragged, origin));
     setBlocks(dragged);
   };
 
@@ -1798,6 +1824,23 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // above AND by the right-click "Duplicate" entry on non-table
   // block context menus. Title and authors are pinned header
   // blocks — silently refuse to clone them.
+  //
+  // An image or logo holding a stored file gets its OWN copy of that file
+  // (record 35, bounded-designs §3.3 D): the clone used to share the
+  // original's path, so a Replace on the original overwrote the clone's
+  // picture (MEASURED, docs/fixes/35-block-copy.md §4). The clone is added at
+  // once, in one undo step, holding its original's file: since record 35
+  // nothing overwrites or deletes a stored file, so sharing is safe (a
+  // Replace on either writes a new file). Its own file, a storage copy (one
+  // try), takes that file's place silently once made, while the clone still
+  // holds it (`settleCopiedFiles`); a copy that cannot be made (storage
+  // unreachable, a refusal not about the file) leaves it its original's file
+  // (review round 1, R1-3), and only a file storage says is not there
+  // empties it, with the paste's toast (`heldAfterCopy`: one rule with ⌘V,
+  // the lead's on the final check's F35-FC-2, correction 5). Waiting for the
+  // copy before adding the clone let a ⌘Z pressed meanwhile undo the step
+  // before, and stacked a second ⌘D's clone on the first (review round 2,
+  // R2-1).
   const duplicateBlock = (id: string) => {
     const src = doc.blocks.find((b) => b.id === id);
     if (!src) return;
@@ -1815,6 +1858,16 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       () => setJustInsertedId((curr) => (curr === clone.id ? null : curr)),
       700,
     );
+    if ((src.type === 'image' || src.type === 'logo') && isStoragePath(src.imageSrc)) {
+      const poster = posterId;
+      const from = src.imageSrc;
+      void copyPosterImage(from!, userId, poster, clone.id, { attempts: 1 }).then((copied) => {
+        const to = heldAfterCopy(from, copied);
+        if (to === from) return;
+        settleCopiedFiles(poster, [{ id: clone.id, from, to }]);
+        if (!to && emptyOnPoster(poster, new Set([clone.id]))) showToast(imagesLostMessage(1));
+      });
+    }
   };
 
   // Re-order a block by moving it N positions in the doc.blocks
@@ -1920,6 +1973,29 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     setJustInsertedId(first);
     setTimeout(() => setJustInsertedId((id) => (id === first ? null : id)), 700);
   };
+  // Copy, cut and paste blocks (record 35, useBlockClipboard.ts). A cut
+  // deletes as Delete does: the credit mark stays, with Delete's toast.
+  const cutBlocks = (ids: string[]): string | null => {
+    const latest = usePosterStore.getState().doc;
+    if (!latest) return null;
+    const outcome = filterDeletable(latest.blocks, ids);
+    if (outcome.removedIds.length > 0) {
+      setBlocks(outcome.blocks);
+      clearSelection();
+    }
+    return outcome.refusalMessage;
+  };
+  const blockClipboard = useBlockClipboard({
+    enabled: !readOnly && !previewMode && sidebarTab !== 'comments',
+    dialogOpen: modalDialogOpen,
+    selectedIds,
+    sheet: { w: cW, h: cH },
+    userId,
+    posterId,
+    commit: commitPastedBlocks,
+    remove: cutBlocks,
+    toast: showToast,
+  });
   const canvasPaste = useCanvasPaste({
     enabled: !readOnly && !previewMode && sidebarTab !== 'comments',
     dialogOpen: modalDialogOpen,
@@ -1930,6 +2006,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     userId,
     posterId,
     commit: commitPastedBlocks,
+    pasteBlocks: (payload) => void blockClipboard.pasteBlocks(payload),
   });
 
   const addBlock = (type: Block['type']) => {
@@ -2361,11 +2438,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     }
     finishBlockSelections(canvas);
 
-    // Deep-clone and strip the editor's chrome: the grid and ruler
-    // overlays, and a selected block's handles, handle row and accent
-    // border (a block just inserted is selected, and clicking the Export
-    // tab does not deselect it; fix 13c review Q-R5). Marked with data
-    // attributes, so user-added SVG content inside blocks is untouched.
+    // Deep-clone and strip the editor's chrome: the in-sheet grid and comment
+    // overlays (the rulers sit outside #poster-canvas), and a selected block's
+    // handles, handle row and accent border (a block just inserted is selected,
+    // and the Export tab does not deselect it; fix 13c review Q-R5). Marked by
+    // data attributes, so user-added SVG content inside blocks is untouched.
     const clone = canvas.cloneNode(true) as HTMLElement;
     stripEditorChrome(clone);
     // Reset the editor's zoom-slider transform on the clone itself: the
@@ -2406,7 +2483,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       data-comment-mode={sidebarTab === 'comments' ? 'true' : undefined}
       // Preview HIDES this tree; it must never unmount it. `printPoster`
       // clones `#poster-canvas` from the live DOM, and the pinch/wheel
-      // listener plus three ResizeObservers all capture `canvasRef.current`
+      // listener plus four ResizeObservers (three here, one in
+      // WorkspaceRulers) all capture `canvasRef.current`
       // with only `[canvasRef]` in their deps — a stable ref object, so a
       // remount would strand every one of them on a detached node. See
       // PosterPreviewOverlay's header for the full account.
@@ -3320,101 +3398,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         </div>
       </div>
 
-        {/* Workspace rulers — fixed at viewport edges, Figma-style.
-            Positioned absolutely over the scroll container so they
-            stay visible during scroll/zoom. */}
-        {showRulerEffective && (() => {
-          // Continuous rulers — compute which inch marks are visible
-          // based on scroll position, then render only those ticks.
-          const inchPx = PX * zoom; // pixels per inch at current zoom
-          // Canvas origin in scroll-container space: the workarea's
-          // padding, less the scroll. Right only on an axis the sheet
-          // fills; on the axis where it is centred, and for the 24 px
-          // ruler bar, the marks are off (plan item 4).
-          const canvasOriginX = gutterX - scrollPos.x;
-          const canvasOriginY = gutterY - scrollPos.y;
-          // Visible range in inches (extend past viewport edges)
-          const viewW = canvasRef.current?.clientWidth ?? 2000;
-          const viewH = canvasRef.current?.clientHeight ?? 1200;
-          const startInchH = Math.floor(-canvasOriginX / inchPx) - 1;
-          const endInchH = Math.ceil((viewW - canvasOriginX) / inchPx) + 1;
-          const startInchV = Math.floor(-canvasOriginY / inchPx) - 1;
-          const endInchV = Math.ceil((viewH - canvasOriginY) / inchPx) + 1;
-
-          const rulerTick = (pos: number, inch: number, major: boolean) => ({
-            pos: canvasOriginX + inch * inchPx,
-            inch,
-            major,
-          });
-
-          return (
-            <>
-              {/* Top ruler bar */}
-              <div style={{
-                position: 'absolute', top: 0, left: 24, right: 0, height: 24,
-                background: '#12121e', borderBottom: '1px solid rgba(255,255,255,0.08)',
-                overflow: 'hidden', pointerEvents: 'none', zIndex: 12,
-              }}>
-                {Array.from({ length: endInchH - startInchH }, (_, i) => {
-                  const inch = startInchH + i;
-                  const x = canvasOriginX + inch * inchPx;
-                  if (x < -inchPx || x > viewW + inchPx) return null;
-                  const isMajor = inch % 5 === 0;
-                  return (
-                    <div key={inch} style={{ position: 'absolute', left: x, bottom: 0 }}>
-                      <div style={{ width: 1, height: isMajor ? 12 : inch % 1 === 0 ? 7 : 4, background: 'rgba(255,255,255,0.35)' }} />
-                      {isMajor && (
-                        <span style={{
-                          position: 'absolute', left: 3, bottom: 12,
-                          fontSize: 9, color: 'rgba(255,255,255,0.45)',
-                          fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap',
-                        }}>
-                          {inch}"
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Left ruler bar */}
-              <div style={{
-                position: 'absolute', top: 24, left: 0, bottom: 0, width: 24,
-                background: '#12121e', borderRight: '1px solid rgba(255,255,255,0.08)',
-                overflow: 'hidden', pointerEvents: 'none', zIndex: 12,
-              }}>
-                {Array.from({ length: endInchV - startInchV }, (_, i) => {
-                  const inch = startInchV + i;
-                  const y = canvasOriginY + inch * inchPx;
-                  if (y < -inchPx || y > viewH + inchPx) return null;
-                  const isMajor = inch % 5 === 0;
-                  return (
-                    <div key={inch} style={{ position: 'absolute', top: y, left: 0 }}>
-                      <div style={{ height: 1, width: isMajor ? 12 : 7, background: 'rgba(255,255,255,0.35)' }} />
-                      {isMajor && (
-                        <span style={{
-                          position: 'absolute', top: 3, left: 12,
-                          fontSize: 9, color: 'rgba(255,255,255,0.45)',
-                          fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap',
-                          writingMode: 'vertical-lr',
-                        }}>
-                          {inch}"
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Corner square */}
-              <div style={{
-                position: 'absolute', top: 0, left: 0, width: 24, height: 24,
-                background: '#12121e',
-                borderRight: '1px solid rgba(255,255,255,0.08)',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
-                zIndex: 13, pointerEvents: 'none',
-              }} />
-            </>
-          );
-        })()}
+        {/* Workspace rulers — fixed at the canvas's edges, Figma-style. */}
+        {showRulerEffective && (
+          <WorkspaceRulers canvasRef={canvasRef} zoom={zoom} gutterX={gutterX} gutterY={gutterY} />
+        )}
 
         <UndoToast
           key={undoToast?.seq ?? 0}

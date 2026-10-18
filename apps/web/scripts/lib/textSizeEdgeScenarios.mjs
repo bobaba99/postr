@@ -3,6 +3,8 @@
  * record 33 found (docs/fixes/33-text-size.md §9, R1-F1 to R1-F3): a body
  * that is not a size, a level that is not a size, and the two round trips
  * the anchor does not keep exact. Folded in from the reviewer's probe.
+ * (R1-F2's reload, RELOAD12, moved to lib/textSizeReloadScenarios.mjs as a
+ * claim of record 37.)
  * Each enters as a user does: the Style tab's Body field cleared with its
  * own keys (select all, Backspace), the top bar's buttons with the mouse,
  * the top bar's Undo, a reload. The expected sizes come from the record's
@@ -133,29 +135,6 @@ async function reload(page) {
   await page.reload();
   await page.waitForSelector('#poster-canvas [data-block-id]', { timeout: 90000 });
   await page.waitForTimeout(800);
-}
-
-/**
- * RELOAD12 (information, R1-F2, the sibling of record 33 §6 f on an
- * ordinary path): the Style tab's Body field typed to 12 pt (its minimum),
- * A+ once, saved, reloaded: each level drawn at 12 pt, after A+ and after
- * the reload (the editor page resets a level above its load-time ceiling).
- */
-export async function reloadSmallBody(page, ed) {
-  await needControl(page);
-  await openTab(page, 'style');
-  const f = styleField(page, 3);
-  await f.click({ clickCount: 3 });
-  await f.press(`${MOD}+a`);
-  await f.pressSequentially('12', { delay: 40 });
-  await page.waitForTimeout(350);
-  const at12 = await editorLevels(page);
-  await pressSize(page, 'up');
-  const up = await editorLevels(page);
-  const ok = await saved(page, ed, 'body', (await storeSizes(page)).body);
-  await reload(page);
-  const after = await editorLevels(page);
-  return { numbers: { saved: ok, at12: ptOf(at12), afterUp: ptOf(up), afterReload: ptOf(after), resetOnReload: moved(up, after, ['title', 'heading', 'authors', 'body']) } };
 }
 
 /**

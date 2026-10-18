@@ -827,20 +827,44 @@ body {
  * the UA focus ring — so keyboard focus was invisible. One house
  * ring in the accent token, applied to native buttons and to the
  * role="button" pattern, keeps keyboard location legible without
- * redesigning each component's hover/active styling. Mouse users
- * are unaffected: :focus-visible only matches keyboard focus.
+ * redesigning each component's hover/active styling.
  *
  * `!important` on the outline: `all: 'unset'` is an INLINE style, and an
  * inline declaration beats any stylesheet rule without it, so the ring
  * never drew on those buttons (measured in fix 03: 11 of 11 in the editor
  * matched :focus-visible with outline-style none). Only the outline: the
  * radius stays each button's own.
+ *
+ * Keyboard navigation only (plan item 20, docs/fixes/20-focus-ring.md):
+ * Chromium turns :focus-visible on for a button the mouse focused once a
+ * key is pressed (any but ⌘, Ctrl and Alt, alone or in a chord), so a mouse
+ * user who clicked Zoom in and then pressed an arrow or Shift saw the ring.
+ * lib/inputModality.ts marks <html> with data-postr-input-modality:
+ * "pointer" after a pointer press, "keyboard" after Tab; no other key
+ * changes it. The ring is drawn unless the page is in pointer mode (before
+ * any input, as the browser decides). :where() keeps the rules below at
+ * the specificity they had.
  */
-button:focus-visible,
-[role="button"]:focus-visible {
+:where(html:not([data-postr-input-modality="pointer"])) button:focus-visible,
+:where(html:not([data-postr-input-modality="pointer"])) [role="button"]:focus-visible {
   outline: 2px solid #7c6aed !important;
   outline-offset: 2px !important;
   border-radius: 4px;
+}
+
+/* In pointer mode the browser's own ring is off too, on the same buttons
+ * and on the chrome's other click targets that draw one after a key: links
+ * (the sidebar's Postr and Back to My Posters), checkboxes (an author's
+ * Corresponding and Equal contrib., a table's Show caption) and <summary>
+ * disclosures (the Edit tab's table tips, the sign-up page's email
+ * preferences, the pricing page's "What's included"). Text fields and menus
+ * keep theirs. */
+:where(html[data-postr-input-modality="pointer"]) button:focus-visible,
+:where(html[data-postr-input-modality="pointer"]) [role="button"]:focus-visible,
+:where(html[data-postr-input-modality="pointer"]) a[href]:focus-visible,
+:where(html[data-postr-input-modality="pointer"]) input[type="checkbox"]:focus-visible,
+:where(html[data-postr-input-modality="pointer"]) summary:focus-visible {
+  outline: none !important;
 }
 
 /* Buttons that fill a clipped container (a rail tab, a section header) or
@@ -857,4 +881,17 @@ button:focus-visible,
 textarea.postr-code-editor:focus-visible {
   outline: 2px solid #7c6aed;
   outline-offset: -2px;
+}
+
+/*
+ * The workspace rulers (fix 04, WorkspaceRulers.tsx) never print. The app's
+ * own prints copy #poster-canvas, which never holds them; the browser's own
+ * File › Print of the editor page, which no key the app catches, printed
+ * the two bars and the corner with the rest of the page (the review of the
+ * port, R1-F3; ruler-check.mjs file-print-media).
+ */
+@media print {
+  [data-postr-ruler] {
+    display: none !important;
+  }
 }

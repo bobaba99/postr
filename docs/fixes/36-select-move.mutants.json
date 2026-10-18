@@ -263,7 +263,7 @@
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "    if (origin) storeSetBlocksSilent(origin);\n",
+          "    if (origin) storeSetBlocksSilent(atPreDragGeometry(dragged, origin));\n",
           ""
         ]
       ]
@@ -323,6 +323,36 @@
           "src/poster/PosterEditor.tsx",
           "      if (action.kind === 'arrowIgnored') {\n        e.preventDefault();\n        return;\n      }",
           "      if (action.kind === 'arrowIgnored') {\n        return;\n      }"
+        ]
+      ]
+    },
+    "group-move-from-origin": {
+      "undoes": "the merge of records 35 and 36: each group move rebuilds the poster from the drag's start, so a change made during the drag is lost",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    const next = currentBlocks().map((blk) => {\n      const o = start.get(blk.id);\n      if (!selectedIds.has(blk.id) || !o) return blk;\n      return {\n        ...blk,\n        x: snap(Math.max(0, o.x + dx)),",
+          "    const next = groupDragOrigin.current.map((blk) => {\n      const o = blk;\n      if (!selectedIds.has(blk.id)) return blk;\n      return {\n        ...blk,\n        x: snap(Math.max(0, o.x + dx)),"
+        ]
+      ]
+    },
+    "group-resize-from-origin": {
+      "undoes": "the merge of records 35 and 36: each group resize step rebuilds the poster from the drag's start",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    const next = currentBlocks().map((blk) => {\n      const o = start.get(blk.id);\n      if (!selectedIds.has(blk.id) || !o) return blk;\n      const sx",
+          "    const next = origin.map((blk) => {\n      const o = blk;\n      if (!selectedIds.has(blk.id)) return blk;\n      const sx"
+        ]
+      ]
+    },
+    "group-end-snapshot-origin": {
+      "undoes": "the merge of records 35 and 36: the group drag's undo snapshot is the poster at the drag's start, so its undo reverts a change made during the drag",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    if (origin) storeSetBlocksSilent(atPreDragGeometry(dragged, origin));",
+          "    if (origin) storeSetBlocksSilent(origin);"
         ]
       ]
     }

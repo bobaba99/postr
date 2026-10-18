@@ -117,25 +117,6 @@
       ],
       "unguarded": "Reached, but with no visible effect: fractional canvases occur (in 664 of 720 of review R2's sweep steps, MEASURED by R2; in about a third of the frames of a panel slide, 19 to 20 of 60 to 61 in 3 runs, MEASURED by the step 11 claims audit's scratch probe audit/claims/fractional-canvas-probe.mjs). Yet without the floor, a visible defect (overflow, a scrollbar, a hidden sheet) appeared in 0 of 720 steps (MEASURED by R2). No check can show it; it is kept as a cheap guarantee against a sub-pixel edge (INSPECTED)."
     },
-    "ruler-origin-96": {
-      "undoes": "A — the rulers count from the gutter the workarea draws, not a copy of 96",
-      "expect": "survive",
-      "why": "the ruler's tick positions against the sheet need layout; fit-check.mjs gates them (claim Hr: the filled-axis error stays at main's 24 px)",
-      "edits": [
-        [
-          "src/poster/PosterEditor.tsx",
-          "          const canvasOriginX = gutterX - scrollPos.x;\n          const canvasOriginY = gutterY - scrollPos.y;",
-          "          const canvasOriginX = 96 - scrollPos.x;\n          const canvasOriginY = 96 - scrollPos.y;"
-        ]
-      ],
-      "browser": {
-        "harness": "scripts/fit-check.mjs",
-        "scenarios": [
-          "fit-1440x900-48x36-default",
-          "fit-1280x800-36x48-default"
-        ]
-      }
-    },
     "fit-keeps-manual-zoom": {
       "undoes": "A — FIT, the readout and a new size go back to the fitted zoom",
       "edits": [

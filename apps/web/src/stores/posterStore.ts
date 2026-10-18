@@ -116,6 +116,15 @@ export interface PosterStoreState {
   setBlocks: (blocks: Block[]) => void;
   /** Set blocks without pushing to undo — for drag intermediates. */
   setBlocksSilent: (blocks: Block[]) => void;
+  /**
+   * Rewrite the blocks of every undo and redo step with `edit` (null: that
+   * step unchanged). Not an edit: the present document, the steps' order and
+   * the burst being typed stay as they are. Record 35, review round 3
+   * (R3-3): a pasted or cloned image's own file takes the place of the
+   * source it showed while copying in the steps too, so an undo or redo of
+   * any step does not put the source back.
+   */
+  rewriteHistory: (edit: (blocks: readonly Block[]) => Block[] | null) => void;
   /** Undo one step; false when there was nothing to undo. */
   undo: () => boolean;
   /** Redo one step; false when there was nothing to redo. */
@@ -561,6 +570,15 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
         doc: { ...state.doc, blocks: guardLocked(state.doc.blocks, blocks) },
       };
     }),
+
+  rewriteHistory: (edit) => {
+    const step = (doc: PosterDoc): PosterDoc => {
+      const blocks = edit(doc.blocks);
+      return blocks ? { ...doc, blocks } : doc;
+    };
+    undoStack = undoStack.map(step);
+    redoStack = redoStack.map(step);
+  },
 
   // Undo/redo restore whole documents from the history stacks, which
   // is a second way to lose a locked block: a snapshot taken BEFORE

@@ -155,6 +155,15 @@ export function notePaste() {
   current().ownStep = true;
 }
 
+/**
+ * A cut: a step of its own even when the editor takes it and deletes the
+ * text itself, firing no `beforeinput` (a superscript cut alone,
+ * poster/scriptClipboard.ts; record 39 §9, R1-F1).
+ */
+export function noteCut() {
+  current().ownStep = true;
+}
+
 /** An input event of type historyUndo / historyRedo: the browser's own history ran. */
 export function noteHistoryInput() {
   current().historyInput = true;
