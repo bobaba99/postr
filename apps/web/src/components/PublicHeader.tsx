@@ -45,6 +45,7 @@ import { useFeedbackStore } from '@/stores/feedbackStore';
 import { CHROME_COPY, type ChromeCopy } from '@/i18n/chrome';
 import { counterpartPath, localizedPath, useLang, type Lang } from '@/i18n/lang';
 import { LanguageLink } from '@/components/LanguageLink';
+import { WHY_POSTERS_NAV_ENABLED } from '@/config/features';
 import type { User } from '@supabase/supabase-js';
 
 /** One standalone tool as the nav shows it. */
@@ -90,8 +91,9 @@ function toolLinksFor(lang: Lang): readonly ToolLink[] {
 }
 
 /**
- * The full public nav set, in display order — the tools plus the two
- * Learn pages.
+ * The full public nav set, in display order — the tools plus the Learn
+ * pages. "Why posters" sits between Pricing and About only while
+ * WHY_POSTERS_NAV_ENABLED is on (config/features.ts; hidden 2026-10-29).
  *
  * Exported and consumed by the dashboard header (pages/Home) and the
  * admin header (pages/AdminGallery) rather than being retyped there.
@@ -106,7 +108,9 @@ export function navLinksFor(lang: Lang): ReadonlyArray<{ to: string; label: stri
   return [
     ...toolLinksFor(lang).map(({ to, label }) => ({ to, label })),
     { to: localizedPath('/pricing', lang), label: c.pricing },
-    { to: localizedPath('/why-posters', lang), label: c.whyPosters },
+    ...(WHY_POSTERS_NAV_ENABLED
+      ? [{ to: localizedPath('/why-posters', lang), label: c.whyPosters }]
+      : []),
     { to: localizedPath('/about', lang), label: c.about },
   ];
 }

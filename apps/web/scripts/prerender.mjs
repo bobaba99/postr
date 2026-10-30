@@ -35,8 +35,9 @@
  * language, plus one link to its twin in the other language.
  *
  * src/seo/__tests__/prerenderFrench.test.ts runs this script (a copy of it
- * and of lib/headTags.mjs and routes.json, so a mutant of any of them is
- * what runs) on a copy of the shell, and reads what it writes.
+ * and of lib/headTags.mjs, routes.json and config/features.ts, so a mutant
+ * of any of them is what runs) on a copy of the shell, and reads what it
+ * writes.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -49,6 +50,36 @@ const DIST = join(WEB_ROOT, 'dist');
 
 const routes = JSON.parse(
   readFileSync(join(WEB_ROOT, 'src/seo/routes.json'), 'utf8'),
+);
+
+/**
+ * A switch in src/config/features.ts, read from that file so this script
+ * and the app follow one value (the app imports it). Only a declaration at
+ * the start of a line counts, so a comment that quotes one cannot win, and
+ * there must be exactly one: anything else stops the build rather than
+ * guessing.
+ */
+function featureSwitch(name) {
+  const source = readFileSync(join(WEB_ROOT, 'src/config/features.ts'), 'utf8');
+  const found = [
+    ...source.matchAll(new RegExp(`^export const ${name}\\s*=\\s*(true|false)\\s*;`, 'gm')),
+  ];
+  if (found.length !== 1) {
+    console.error(
+      `[prerender] src/config/features.ts must declare ${name} = true | false once, at the start of a line (found ${found.length}).`,
+    );
+    process.exit(1);
+  }
+  return found[0][1] === 'true';
+}
+
+/**
+ * Pages the app's nav does not link while their switch is off. They are
+ * still written below and listed in the sitemap; the fallback links leave
+ * them out, as the app's nav does.
+ */
+const UNLINKED = new Set(
+  featureSwitch('WHY_POSTERS_NAV_ENABLED') ? [] : ['/why-posters', '/why-posters/fr'],
 );
 
 const site = {
@@ -80,15 +111,16 @@ const FALLBACK_WORDS = {
 };
 
 /**
- * The fallback links of a page: the static pages in its language, sign-in
- * in its language, and its twin in the other language when there is one.
+ * The fallback links of a page: the static pages in its language (less the
+ * UNLINKED ones), sign-in in its language, and its twin in the other
+ * language when there is one.
  */
 function fallbackNavFor(routePath, record) {
   const lang = isFrench(record) ? 'fr' : 'en';
   const other = lang === 'fr' ? 'en' : 'fr';
   const words = FALLBACK_WORDS[lang];
   const links = Object.entries(routes.static)
-    .filter(([, r]) => isFrench(r) === (lang === 'fr'))
+    .filter(([href, r]) => isFrench(r) === (lang === 'fr') && !UNLINKED.has(href))
     .map(([href, r]) => ({ href, label: href === '/' || href === '/fr' ? words.home : r.h1 }));
   links.push({ href: lang === 'fr' ? '/auth/fr' : '/auth', label: words.signIn });
   const twin = twinPath(routePath);

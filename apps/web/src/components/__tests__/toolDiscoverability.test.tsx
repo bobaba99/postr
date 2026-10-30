@@ -42,6 +42,7 @@ vi.mock('@/lib/supabase', () => ({
 import { NAV_LINKS, PublicHeader } from '../PublicHeader';
 import { PublicFooter } from '../PublicFooter';
 import Landing from '../../pages/Landing';
+import { WHY_POSTERS_NAV_ENABLED } from '@/config/features';
 
 /**
  * Canonical tool URLs — never the alias spellings, which 308.
@@ -65,8 +66,15 @@ const DEACTIVATED_PATHS = [
   '/presentation-checker',
 ];
 
-/** The Learn pages — the nav after the tools. */
-const LEARN_PATHS = ['/pricing', '/why-posters', '/about'];
+/**
+ * The Learn pages — the nav after the tools. "Why posters" only while its
+ * switch is on (whyPostersHidden.test.tsx, whyPostersShown.test.tsx).
+ */
+const LEARN_PATHS = [
+  '/pricing',
+  ...(WHY_POSTERS_NAV_ENABLED ? ['/why-posters'] : []),
+  '/about',
+];
 
 /** The full public nav, in order: tools first, then the Learn pages. */
 const PUBLIC_NAV_PATHS = [...TOOL_PATHS, ...LEARN_PATHS];

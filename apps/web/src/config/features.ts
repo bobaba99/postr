@@ -214,3 +214,27 @@ export const ADJUSTMENTS_ENABLED = false;
  * still render.
  */
 export const EDITOR_EXTRAS_ENABLED = false;
+
+/**
+ * WHY_POSTERS_NAV_ENABLED — the links to the "Why poster sessions matter"
+ * page were hidden on 2026-10-29 (owner: "hide the 'why poster' menu for
+ * now"). Only the links: /why-posters and /why-posters/fr still render,
+ * keep their prerendered pages and sitemap entries, and stay each other's
+ * language twin. What is switched off:
+ *   - components/PublicHeader.tsx navLinksFor: no "Why posters" entry, so
+ *     none in the public header's flat row, in its phone menu, or in the
+ *     dashboard and admin headers that take NAV_LINKS
+ *   - components/PublicFooter.tsx: no "Why poster sessions" in the Learn
+ *     column
+ *   - scripts/prerender.mjs: the fallback links of every prerendered page
+ *     (for readers that run no script, shown until the app mounts) leave
+ *     both pages out; the script reads this line from this file, so keep
+ *     it one `export const WHY_POSTERS_NAV_ENABLED = true | false;` at the
+ *     start of a line (anything else stops the build)
+ * Turning it back on: flip this. The labels stay in i18n/chrome.ts.
+ * src/components/__tests__/whyPostersHidden.test.tsx pins the links' absence
+ * while this is false; whyPostersShown.test.tsx turns it on;
+ * src/seo/__tests__/prerenderFrench.test.ts (P5) follows it for the
+ * fallback links.
+ */
+export const WHY_POSTERS_NAV_ENABLED = false;

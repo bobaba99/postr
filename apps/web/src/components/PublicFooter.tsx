@@ -19,6 +19,7 @@ import { useFeedbackStore } from '@/stores/feedbackStore';
 import { CHROME_COPY } from '@/i18n/chrome';
 import { counterpartPath, localizedPath, useLang } from '@/i18n/lang';
 import { LanguageLink } from '@/components/LanguageLink';
+import { WHY_POSTERS_NAV_ENABLED } from '@/config/features';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -69,7 +70,11 @@ export function PublicFooter() {
 
           <FooterColumn title={c.learn}>
             <FooterLink to={to('/about')}>{c.about}</FooterLink>
-            <FooterLink to={to('/why-posters')}>{c.whyPosters}</FooterLink>
+            {/* Hidden while WHY_POSTERS_NAV_ENABLED is off (2026-10-29);
+                the page itself stays at /why-posters. */}
+            {WHY_POSTERS_NAV_ENABLED && (
+              <FooterLink to={to('/why-posters')}>{c.whyPosters}</FooterLink>
+            )}
             <FooterButton onClick={() => openFeedback('other')}>
               {c.sendFeedback}
             </FooterButton>

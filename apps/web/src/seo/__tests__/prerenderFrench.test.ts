@@ -3,11 +3,11 @@
  *
  * Runs the real build steps (scripts/prerender.mjs, then
  * scripts/gen-sitemap.mjs) in plain Node, as `npm run build` does: copies of
- * the two scripts, scripts/lib/headTags.mjs and src/seo/routes.json, laid
- * out as in apps/web, with a copy of the shell index.html as dist/, in a
- * scratch folder; then reads the files they write. The copies are read
- * through copyScan's readSource, so under scripts/mutation-check.mjs a
- * mutant of any of the four is what runs. Claims:
+ * the two scripts, scripts/lib/headTags.mjs, src/seo/routes.json and
+ * src/config/features.ts, laid out as in apps/web, with a copy of the shell
+ * index.html as dist/, in a scratch folder; then reads the files they write.
+ * The copies are read through copyScan's readSource, so under
+ * scripts/mutation-check.mjs a mutant of any of the five is what runs. Claims:
  *
  *   P1  every French page in routes.json is written to <path>/index.html
  *       with <html lang="fr-CA">, its French title, description, canonical
@@ -17,7 +17,15 @@
  *   P3  a page's fallback links (for readers that run no script) are in
  *       its own language, plus one link to its counterpart;
  *   P4  the sitemap lists the French pages that are indexable, and only
- *       those (no /auth/fr).
+ *       those (no /auth/fr);
+ *   P5  the fallback links follow the app's nav: no page links the Why
+ *       posters page in its language while WHY_POSTERS_NAV_ENABLED is off
+ *       (2026-10-29), every page does while it is on, and the page stays
+ *       written and in the sitemap either way. The build runs twice: as
+ *       shipped, and with the switch inverted in its copy of features.ts
+ *       under a comment that quotes the shipped line, so both halves are
+ *       checked whatever ships, and the build must read the declaration,
+ *       not the first text that looks like it.
  *
  * Re-run: npx vitest run src/seo/__tests__/prerenderFrench.test.ts
  */
@@ -27,12 +35,16 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readSource } from '@/test/copyScan';
+import { WHY_POSTERS_NAV_ENABLED } from '@/config/features';
 import routes from '../routes.json';
 
 const WEB = process.cwd();
 const ORIGIN = routes.siteOrigin;
 let root = '';
 let dist = '';
+/** The same build with WHY_POSTERS_NAV_ENABLED inverted (P5). */
+let rootFlipped = '';
+let distFlipped = '';
 
 type RouteRecord = {
   title: string;
@@ -63,22 +75,66 @@ const attr = (html: string, re: RegExp) => {
 };
 const englishOf = (path: string) => (path === '/fr' ? '/' : path.replace(/\/fr$/, ''));
 
+/** A page's fallback nav: its label and links, decoded. */
+const navOf = (html: string) => {
+  const nav = html.match(/<nav aria-label="([^"]*)">([\s\S]*?)<\/nav>/);
+  if (!nav) throw new Error('no fallback nav');
+  const links = [...(nav[2] ?? '').matchAll(/<a href="([^"]*)"[^>]*>([^<]*)<\/a>/g)].map((m) => ({
+    href: m[1] ?? '',
+    text: decode(m[2] ?? ''),
+  }));
+  return { label: nav[1], links };
+};
+
 /** The build's inputs, copied into the scratch apps/web as they are (or as a mutant has them). */
-const COPIED = ['scripts/prerender.mjs', 'scripts/gen-sitemap.mjs', 'scripts/lib/headTags.mjs', 'src/seo/routes.json'];
+const COPIED = [
+  'scripts/prerender.mjs',
+  'scripts/gen-sitemap.mjs',
+  'scripts/lib/headTags.mjs',
+  'src/seo/routes.json',
+  'src/config/features.ts',
+];
+
+/**
+ * Copies the build's inputs into a scratch apps/web, passing each file's
+ * text through `edit`, runs the two build steps there, and returns the
+ * scratch folder and its dist/.
+ */
+function buildIn(edit: (file: string, text: string) => string = (_file, text) => text) {
+  const scratch = mkdtempSync(join(tmpdir(), 'postr-prerender-'));
+  const out = join(scratch, 'dist');
+  for (const file of [...COPIED, 'index.html']) {
+    const target = file === 'index.html' ? join(out, 'index.html') : join(scratch, file);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, edit(file, readSource(join(WEB, file))));
+  }
+  execFileSync(process.execPath, [join(scratch, 'scripts/prerender.mjs')], { stdio: 'pipe' });
+  execFileSync(process.execPath, [join(scratch, 'scripts/gen-sitemap.mjs')], { stdio: 'pipe' });
+  return { scratch, out };
+}
+
+const SWITCH_LINE = /^export const WHY_POSTERS_NAV_ENABLED = (true|false);$/m;
+
+/** features.ts with the switch inverted, under a comment quoting the shipped line. */
+function flipSwitch(text: string): string {
+  if (!SWITCH_LINE.test(text)) throw new Error('features.ts: no WHY_POSTERS_NAV_ENABLED line to flip');
+  return text.replace(
+    SWITCH_LINE,
+    `/* export const WHY_POSTERS_NAV_ENABLED = ${WHY_POSTERS_NAV_ENABLED}; */\n` +
+      `export const WHY_POSTERS_NAV_ENABLED = ${!WHY_POSTERS_NAV_ENABLED};`,
+  );
+}
 
 beforeAll(() => {
-  root = mkdtempSync(join(tmpdir(), 'postr-prerender-'));
-  dist = join(root, 'dist');
-  for (const file of [...COPIED, 'index.html']) {
-    const target = file === 'index.html' ? join(dist, 'index.html') : join(root, file);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, readSource(join(WEB, file)));
-  }
-  execFileSync(process.execPath, [join(root, 'scripts/prerender.mjs')], { stdio: 'pipe' });
-  execFileSync(process.execPath, [join(root, 'scripts/gen-sitemap.mjs')], { stdio: 'pipe' });
+  ({ scratch: root, out: dist } = buildIn());
+  ({ scratch: rootFlipped, out: distFlipped } = buildIn((file, text) =>
+    file === 'src/config/features.ts' ? flipSwitch(text) : text,
+  ));
 });
 afterAll(() => {
-  if (root) rmSync(root, { recursive: true, force: true });
+  for (const scratch of [root, rootFlipped]) {
+    if (scratch) rmSync(scratch, { recursive: true, force: true });
+  }
 });
 
 describe('P1 — each French page is written with a French head', () => {
@@ -122,16 +178,6 @@ describe('P2 — hreflang alternates on both pages of each pair', () => {
 });
 
 describe('P3 — the fallback links are in the page’s language', () => {
-  const navOf = (html: string) => {
-    const nav = html.match(/<nav aria-label="([^"]*)">([\s\S]*?)<\/nav>/);
-    if (!nav) throw new Error('no fallback nav');
-    const links = [...(nav[2] ?? '').matchAll(/<a href="([^"]*)"[^>]*>([^<]*)<\/a>/g)].map((m) => ({
-      href: m[1] ?? '',
-      text: decode(m[2] ?? ''),
-    }));
-    return { label: nav[1], links };
-  };
-
   it.each(FRENCH)('%s links French pages, and its English page once', (path) => {
     const { label, links } = navOf(read(path));
     expect(label).toBe('Pages de Postr');
@@ -159,5 +205,46 @@ describe('P4 — the sitemap', () => {
     }
     expect(locs).not.toContain(`${ORIGIN}/auth/fr`);
     expect(locs).toContain(`${ORIGIN}/fr`);
+  });
+});
+
+describe('P5 — the fallback links follow the app’s nav: Why posters', () => {
+  /** The Why posters page in a record's language. */
+  const pageIn = (record: RouteRecord) => (record.language === 'fr-CA' ? '/why-posters/fr' : '/why-posters');
+  /** The link to a page's twin in the other language, which P3 covers. */
+  const isLanguageLink = (text: string) => text === 'English' || text === 'Français';
+  /** Each build, with the switch value it was made with (read once beforeAll has run). */
+  const builds = () =>
+    [
+      ['as shipped', dist, WHY_POSTERS_NAV_ENABLED],
+      ['switch inverted', distFlipped, !WHY_POSTERS_NAV_ENABLED],
+    ] as const;
+  const readIn = (out: string, path: string) =>
+    readFileSync(join(out, path === '/' ? '' : path.slice(1), 'index.html'), 'utf8');
+
+  it.each(PRERENDERED)('%s links the page only while WHY_POSTERS_NAV_ENABLED is on', (path, record) => {
+    for (const [build, out, on] of builds()) {
+      const hrefs = navOf(readIn(out, path)).links.filter((l) => !isLanguageLink(l.text)).map((l) => l.href);
+      expect(hrefs, build).toContain(record.language === 'fr-CA' ? '/pricing/fr' : '/pricing');
+      expect(hrefs.includes(pageIn(record)), build).toBe(on);
+    }
+  });
+
+  it('the 404 page links it only while the switch is on', () => {
+    for (const [build, out, on] of builds()) {
+      const hrefs = navOf(readFileSync(join(out, '404.html'), 'utf8')).links.map((l) => l.href);
+      expect(hrefs, build).toContain('/pricing');
+      expect(hrefs.includes('/why-posters'), build).toBe(on);
+    }
+  });
+
+  it('writes both pages and keeps them in the sitemap either way', () => {
+    for (const [build, out] of builds()) {
+      expect(attr(readIn(out, '/why-posters'), /<h1>([^<]*)<\/h1>/), build).toBe(STATIC['/why-posters']?.h1);
+      expect(attr(readIn(out, '/why-posters/fr'), /<h1>([^<]*)<\/h1>/), build).toBe(STATIC['/why-posters/fr']?.h1);
+      const xml = readFileSync(join(out, 'sitemap-static.xml'), 'utf8');
+      expect(xml, build).toContain(`<loc>${ORIGIN}/why-posters</loc>`);
+      expect(xml, build).toContain(`<loc>${ORIGIN}/why-posters/fr</loc>`);
+    }
   });
 });
