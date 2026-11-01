@@ -46,7 +46,20 @@ export interface FeedbackRow {
 }
 
 const TITLE_MAX = 120;
+/** What the user may type in the Details box. */
 const BODY_MAX = 4000;
+/** The console log kept with a report: its last 60,000 characters. */
+const LOG_MAX = 60_000;
+/** The longest `body` the database stores: the user's text (BODY_MAX)
+ *  plus the attachment section plus the console log (LOG_MAX), with room
+ *  for the section headers. It MUST equal the upper bound of
+ *  `feedback_body_check` (migration 20261101000000); a test reads the
+ *  migration and fails when the two drift. Until that migration the
+ *  database allowed only 4000, so every report sent with its console log
+ *  was refused by the database and never stored. */
+export const FEEDBACK_STORED_BODY_MAX = 70_000;
+/** A file name in the "upload failed" metadata line is cut to this. */
+const ATTACHMENT_NAME_MAX = 200;
 
 export interface FeedbackValidationError {
   field: 'title' | 'body';
@@ -112,20 +125,21 @@ export async function submitFeedback(input: FeedbackInput): Promise<void> {
       input.attachment,
     );
   }
-  const LOG_MAX = 60_000;
   const log = input.log?.slice(-LOG_MAX) ?? '';
   const sections: string[] = [input.body.trim()];
   if (attachmentPath) {
     sections.push(`\n--- ATTACHMENT ---\nstorage://${attachmentPath}`);
   } else if (input.attachment) {
     sections.push(
-      `\n--- ATTACHMENT (upload failed; metadata only) ---\nname: ${input.attachment.name}\nsize: ${input.attachment.size} bytes\ntype: ${input.attachment.type}`,
+      `\n--- ATTACHMENT (upload failed; metadata only) ---\nname: ${input.attachment.name.slice(0, ATTACHMENT_NAME_MAX)}\nsize: ${input.attachment.size} bytes\ntype: ${input.attachment.type.slice(0, 100)}`,
     );
   }
   if (log) {
     sections.push(`\n--- CONSOLE LOG (last ${log.length} chars) ---\n${log}`);
   }
-  const finalBody = sections.join('\n').slice(0, 1_000_000);
+  // A safety net only: the parts above already fit. The user's own text
+  // comes first, so a cut can only shorten the end of the log.
+  const finalBody = sections.join('\n').slice(0, FEEDBACK_STORED_BODY_MAX);
 
   const { error } = await db.from('feedback').insert({
     user_id: userData.user.id,
