@@ -1,0 +1,68 @@
+name: cron-feedback-digest
+
+# Daily feedback digest — emails the owner every feedback row (bug,
+# feature, other) filed since the last digest. The API endpoint lives at
+# `/cron/feedback-digest` on the Render service and is gated by
+# CRON_SECRET (matching the Authorization: Bearer header). When there is
+# no new feedback the endpoint sends nothing.
+#
+# Schedule: every day at 13:17 UTC (09:17 Montréal in summer, 08:17 in
+# winter). Off the top of the hour because GitHub delays scheduled runs
+# at :00 under load.
+#
+# A red run means feedback was NOT emailed (missing setting, Resend
+# refused, Supabase unreachable). GitHub emails the repo owner about a
+# failed scheduled run, and the next run retries the same rows.
+#
+# Secrets required (shared with cron-cleanup-guests):
+#   CRON_SECRET        — shared secret matching the API's env var
+#   API_BASE_URL       — https://api.postr.sh (or whatever Render hostname)
+# Env vars required on the API service (Render), not here:
+#   RESEND_API_KEY, FEEDBACK_DIGEST_FROM, FEEDBACK_DIGEST_TO
+
+on:
+  schedule:
+    # min hour dom month dow
+    - cron: '17 13 * * *'
+  # Manual run from the Actions tab (e.g. to test the setup right away).
+  workflow_dispatch:
+
+concurrency:
+  group: cron-feedback-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    name: Email new feedback
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call feedback digest endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ] || [ -z "$API_BASE_URL" ]; then
+            echo "Missing CRON_SECRET or API_BASE_URL secret. Aborting."
+            exit 1
+          fi
+
+          # Render services sleep after inactivity on the free tier —
+          # curl's retry flags handle the cold-start 502/connection-reset.
+          response=$(curl --silent --show-error \
+            --retry 3 \
+            --retry-connrefused \
+            --retry-delay 10 \
+            --connect-timeout 30 \
+            --max-time 120 \
+            --write-out "\nHTTP_STATUS:%{http_code}" \
+            -X POST "$API_BASE_URL/cron/feedback-digest" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")
+
+          echo "$response"
+          status=$(echo "$response" | tail -n1 | sed 's/HTTP_STATUS://')
+          if [ "$status" != "200" ]; then
+            echo "Feedback digest failed with status $status"
+            exit 1
+          fi

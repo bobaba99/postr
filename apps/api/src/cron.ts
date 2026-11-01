@@ -8,6 +8,9 @@
  *
  * Jobs currently registered:
  *   POST /cron/cleanup-anonymous-users — delete stale guest accounts
+ *   POST /cron/feedback-digest — email the owner new feedback rows
+ *     (feedbackDigest.ts; needs RESEND_API_KEY, FEEDBACK_DIGEST_FROM,
+ *     FEEDBACK_DIGEST_TO)
  *
  * Deliberately minimal framework: no cron scheduler in-process, no
  * queue. GitHub Actions is the scheduler; Express just exposes the
@@ -16,6 +19,18 @@
 import type { Request, Response, Router } from 'express';
 import express from 'express';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import {
+  createResendSender,
+  readDigestConfig,
+  runFeedbackDigest,
+  type SendEmail,
+} from './feedbackDigest.js';
+
+/** Seams for tests: where the digest reads its env and how it sends. */
+export interface CronDeps {
+  env?: NodeJS.ProcessEnv;
+  makeSender?: (resendApiKey: string) => SendEmail;
+}
 
 // Stale guests older than this are candidates for deletion. Chosen
 // deliberately long — 14 days gives someone who started a poster on
@@ -34,8 +49,51 @@ const MAX_DELETIONS_PER_RUN = 500;
  */
 export function createCronRouter(
   getSupabaseAdmin: () => SupabaseClient | null = defaultGetSupabaseAdmin,
+  deps: CronDeps = {},
 ): Router {
   const router = express.Router();
+
+  router.post('/cron/feedback-digest', async (req, res) => {
+    if (!isAuthorizedCron(req)) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return res.status(500).json({
+        error: 'supabase_not_configured',
+        message:
+          'SUPABASE_URL and SUPABASE_SECRET_KEY must both be set for cron jobs.',
+      });
+    }
+
+    // Fail loudly (500 → the GitHub Action goes red → GitHub emails the
+    // repo owner) rather than silently skipping, so a missing setting is
+    // noticed instead of feedback piling up unread.
+    const config = readDigestConfig(deps.env ?? process.env);
+    if ('missing' in config) {
+      return res.status(500).json({
+        error: 'digest_not_configured',
+        message: `Set ${config.missing.join(', ')} on the API service.`,
+        missing: config.missing,
+      });
+    }
+
+    try {
+      const send = (deps.makeSender ?? createResendSender)(config.resendApiKey);
+      const result = await runFeedbackDigest(supabase, send, config);
+      // eslint-disable-next-line no-console
+      console.log(
+        `[cron] feedback-digest found=${result.found} emailed=${result.emailed} remaining=${result.remaining}`,
+      );
+      return res.json({ ok: true, ...result });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'unknown_error';
+      // eslint-disable-next-line no-console
+      console.error('[cron] feedback-digest failed:', message);
+      return res.status(500).json({ ok: false, error: message });
+    }
+  });
 
   router.post('/cron/cleanup-anonymous-users', async (req, res) => {
     if (!isAuthorizedCron(req)) {

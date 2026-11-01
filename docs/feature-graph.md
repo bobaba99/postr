@@ -2265,15 +2265,16 @@ Storage: sessionStorage `postr.signupConsent` (const `:34`; write `:44`, read `:
 #### `data/feedback.ts` — `feedback` repository — no DOM UI; throws user-visible validation errors
 
 **Copy**
-- [ ] "Please add a short title." — validation error, title empty — `feedback.ts:61`
-- [ ] "Title is too long (max 120 characters)." — validation error — `feedback.ts:64`
-- [ ] "Please describe what you have in mind." — validation error, body empty — `feedback.ts:67`
-- [ ] "Description is too long (max 4000 characters)." — validation error — `feedback.ts:70`
-- [ ] "Could not start a session: {message}" — thrown error — `feedback.ts:93`
-- [ ] "Could not establish a session. Please reload and try again." — thrown error — `feedback.ts:97`
-- [ ] "You have reached the daily limit. Please try again tomorrow." — rate-limit error — `feedback.ts:141`
-- [ ] "Could not send feedback: {message}" — thrown error — `feedback.ts:143`
-- [ ] (not UI — stored in DB body for triage) "--- ATTACHMENT ---", "--- ATTACHMENT (upload failed; metadata only) ---", "--- CONSOLE LOG (last {n} chars) ---" — `feedback.ts:119-126`
+- [ ] "Please add a short title." — validation error, title empty — `feedback.ts:74`
+- [ ] "Title is too long (max 120 characters)." — validation error — `feedback.ts:77`
+- [ ] "Please describe what you have in mind." — validation error, body empty — `feedback.ts:80`
+- [ ] "Description is too long (max 4000 characters)." — validation error — `feedback.ts:83`
+- [ ] "Could not start a session: {message}" — thrown error — `feedback.ts:106`
+- [ ] "Could not establish a session. Please reload and try again." — thrown error — `feedback.ts:110`
+- [ ] "You have reached the daily limit. Please try again tomorrow." — rate-limit error — `feedback.ts:155`
+- [ ] "Could not send feedback: {message}" — thrown error — `feedback.ts:157`
+- [ ] (not UI — stored in DB body for triage) "--- ATTACHMENT ---", "--- ATTACHMENT (upload failed; metadata only) ---", "--- CONSOLE LOG (last {n} chars) ---" — `feedback.ts:131-139`
+- Stored `body` = the user's text (≤4000) + the sections above, cut at `FEEDBACK_STORED_BODY_MAX` = 70000, which equals the upper bound of `feedback_body_check` (migration `20261101000000`; `data/__tests__/feedback.test.ts` reads the migrations and fails on drift). **Fixed 2026-11-01:** the check was 4000, so a report sent with its console log (typically ~64 000 chars) was refused by the database and never stored. The owner is told of new rows by the daily digest (`POST /cron/feedback-digest`, §APIs).
 
 #### `data/gallery.ts` — `gallery_entries` repository + field constants — no DOM UI
 
@@ -5173,6 +5174,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 | `POST /api/review/critique` | `review/reviewApi.ts` (`requestCritique`) ← PresentationChecker + ReviewTab (§6.17) | Presentation Checker critique — initial + included follow-up (Claude, below); 24-page hard cap (typed `too_many_pages`); 402 `no_credit` / `weekly_quota_exceeded`; credit consume AFTER success (D6, compensated on persistence failure); burst 2×quota + 20/day |
 | `POST /api/review/render-pptx` | `review/ingest/fromPptx.ts` ← PresentationChecker (§6.17) | PPTX → page JPEGs via LibreOffice + poppler (`review/pptx.ts`); SSRF-guarded re-fetch, 413 `pptx_too_large` (50 MB), 2 burst / 10 day; ingest utility — NO credit consumed (the critique charges) |
 | `POST /cron/cleanup-anonymous-users` | scheduled caller (auth-gated cron) | Guest-account GC |
+| `POST /cron/feedback-digest` | `.github/workflows/cron-feedback-digest.yml` (daily 13:17 UTC, auth-gated cron) | Emails the owner every `feedback` row with `notified_at` null (≤50 per email, oldest first), then stamps them; no new rows → no email. Quotes the user's text (≤1500 chars), title, kind, page and account type — never the console log, attachment path, user agent or submitter email. Resend over HTTP with an Idempotency-Key from the row ids; a failed send stamps nothing (next run retries). 500 `digest_not_configured` names a missing `RESEND_API_KEY` / `FEEDBACK_DIGEST_FROM` / `FEEDBACK_DIGEST_TO`. `apps/api/src/feedbackDigest.ts` (2026-11-01) |
 
 - [ ] **PPTX toolchain (D10)** — `apps/api/src/review/pptx.ts` shells `soffice --convert-to pdf` + `pdftoppm -jpeg -r 150` in a per-request temp dir (always removed in `finally`). Render's native Node image has neither binary — deploy the API as a Docker-based service with `libreoffice-impress` + `poppler-utils` (or swap a hosted-convert `PptxRenderer` behind the same interface). PPTX ships last — it must never block the other three input kinds.
 
